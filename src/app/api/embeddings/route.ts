@@ -1,33 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// Generate embedding using OpenAI (Grok doesn't have embeddings API yet)
+// Generate embedding using Google Gemini
 async function generateEmbedding(text: string): Promise<number[]> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   
   if (!apiKey) {
-    throw new Error("OPENAI_API_KEY not configured");
+    throw new Error("GEMINI_API_KEY not configured");
   }
 
-  const response = await fetch("https://api.openai.com/v1/embeddings", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "text-embedding-3-small",
-      input: text,
-    }),
-  });
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "models/text-embedding-004",
+        content: {
+          parts: [{ text: text }],
+        },
+      }),
+    }
+  );
   
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`Embedding generation failed: ${error}`);
+    console.error("Gemini API error:", error);
+    throw new Error(`Failed to generate embedding: ${error}`);
   }
   
   const data = await response.json();
-  return data.data[0].embedding;
+  return data.embedding.values;
 }
 
 export async function POST(request: NextRequest) {

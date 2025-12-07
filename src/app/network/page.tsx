@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import {
   Home,
   Users,
-  Sparkles,
   Loader2,
   MoreHorizontal,
   LogOut,
@@ -52,7 +51,6 @@ interface NetworkProfile {
 const navItems = [
   { icon: Home, label: "Home", href: "/dashboard", active: false },
   { icon: Users, label: "Network", href: "/network", active: true },
-  { icon: Sparkles, label: "Nexus Search", href: "/dashboard", active: false },
 ];
 
 import GraphVisualization from "@/components/GraphVisualization";
@@ -272,7 +270,7 @@ export default function NetworkPage() {
               href="/dashboard"
               className="bg-[#1d9bf0] hover:bg-[#1a8cd8] text-white font-bold rounded-full px-6 py-3 transition-colors"
             >
-              Go to Nexus Search
+              Go to Home
             </a>
           </div>
         )}
