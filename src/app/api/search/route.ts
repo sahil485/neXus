@@ -103,6 +103,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Format and return results with degree info
+    // Convert similarity to a more meaningful match quality label
+    const getMatchQuality = (similarity: number) => {
+      if (similarity >= 0.7) return "Excellent match";
+      if (similarity >= 0.55) return "Strong match";
+      if (similarity >= 0.45) return "Good match";
+      if (similarity >= 0.35) return "Relevant";
+      return "Related";
+    };
+    
     const formattedProfiles = (profiles || []).map((p: any) => ({
       id: p.x_user_id,
       x_user_id: p.x_user_id,
@@ -114,7 +123,7 @@ export async function POST(request: NextRequest) {
       followers_count: p.followers_count,
       following_count: p.following_count,
       degree: p.degree,
-      matchReason: `${Math.round(p.similarity * 100)}% match • ${p.degree === 1 ? '1st' : '2nd'} degree`,
+      matchReason: `${getMatchQuality(p.similarity)} • ${p.degree === 1 ? '1st' : '2nd'} degree`,
     }));
 
     return NextResponse.json({
