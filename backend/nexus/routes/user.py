@@ -6,7 +6,7 @@ from datetime import datetime
 from nexus.utils import get_db
 from nexus.models import User
 from nexus.db import UserDb, XProfile, async_session_maker
-from nexus.services.scraper import retrieve_connections
+from nexus.services.scraper import scrape_connections
 from nexus.services.twitter_client import TwitterClient
 
 
@@ -72,9 +72,9 @@ async def create_or_update_user(user: User, db: AsyncSession = Depends(get_db)):
                 async with async_session_maker() as scrape_session:
                     result = await scrape_session.execute(select(UserDb).where(UserDb.x_user_id == x_user_id))
                     db_user = result.scalar_one()
-                    scrape_result = await retrieve_connections(db_user, scrape_session)
-                    await scrape_session.commit()
+                    scrape_result = await scrape_connections(db_user, scrape_session)
                     print(f"Scraped {scrape_result['profiles_added']} profiles for {user.username}")
+                    print(f"Scraped {scrape_result['second_degree_count']} second-degree connections")
             except Exception as scrape_error:
                 print(f"Background scrape failed for {user.username}: {scrape_error}")
 
