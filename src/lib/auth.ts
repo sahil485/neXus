@@ -164,19 +164,24 @@ const CODE_VERIFIER_COOKIE = "nexus_code_verifier";
 
 export async function setAuthCookies(state: string, codeVerifier: string) {
   const cookieStore = await cookies();
+  const isProduction = process.env.NODE_ENV === "production";
+  
+  // Use 'none' for cross-site OAuth redirects in production (requires secure)
+  // Use 'lax' for development
+  const sameSite = isProduction ? "none" : "lax";
   
   cookieStore.set(AUTH_STATE_COOKIE, state, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProduction,
+    sameSite,
     maxAge: 60 * 10, // 10 minutes
     path: "/",
   });
   
   cookieStore.set(CODE_VERIFIER_COOKIE, codeVerifier, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProduction,
+    sameSite,
     maxAge: 60 * 10, // 10 minutes
     path: "/",
   });
@@ -201,10 +206,12 @@ export async function clearAuthCookies() {
 
 export async function setSession(session: Session) {
   const cookieStore = await cookies();
+  const isProduction = process.env.NODE_ENV === "production";
+  
   cookieStore.set(SESSION_COOKIE, JSON.stringify(session), {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
     maxAge: 60 * 60 * 24 * 7, // 7 days
     path: "/",
   });
