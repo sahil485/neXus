@@ -61,22 +61,63 @@ export default function DashboardPage() {
     setIsSearching(true);
     setSearchQuery(query);
     setHasSearched(true);
+    setSearchResults([]);
     
     try {
-      // Call RAG search API
+      // Use streaming search for dynamic results
       const response = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query, stream: true }),
       });
       
-      if (response.ok) {
-        const data = await response.json();
-        setSearchResults(data.profiles || []);
+      if (!response.ok) throw new Error("Search failed");
+      
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No reader");
+      
+      const decoder = new TextDecoder();
+      let buffer = "";
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+        
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.type === "profile") {
+                // New profile - add to list
+                console.log("New profile:", data.profile.username, "aiReason:", data.profile.aiReason);
+                setSearchResults(prev => [...prev, data.profile]);
+                setIsSearching(false); // Stop spinner once first result arrives
+              } else if (data.type === "update") {
+                // Update existing profile with verification result
+                console.log("Update profile:", data.profile.username, "aiReason:", data.profile.aiReason);
+                setSearchResults(prev => 
+                  prev.map(p => p.id === data.profile.id ? data.profile : p)
+                );
+              } else if (data.type === "remove") {
+                // Remove profile that didn't pass verification
+                setSearchResults(prev => prev.filter(p => p.id !== data.id));
+              } else if (data.type === "done") {
+                // All done
+                setIsSearching(false);
+              }
+            } catch (e) {
+              console.error("Parse error:", e);
+            }
+          }
+        }
       }
     } catch (error) {
       console.error("Search error:", error);
-    } finally {
       setIsSearching(false);
     }
   };
@@ -214,31 +255,53 @@ export default function DashboardPage() {
         {hasSearched && (
           <div className="pb-20">
             {isSearching ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="w-8 h-8 text-[#1d9bf0] animate-spin" />
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full border-2 border-[#1d9bf0]/20 border-t-[#1d9bf0] animate-spin" />
+                  <Search className="w-6 h-6 text-[#1d9bf0] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                </div>
+                <p className="text-[#71767b] text-[14px] mt-4">Searching your network...</p>
               </div>
             ) : searchResults.length > 0 ? (
-              searchResults.map((profile, i) => (
-                <div key={profile.id} className="border-b border-[#2f3336] hover:bg-white/[0.03] transition-colors cursor-pointer">
-                  <div className="p-4">
-                    <ProfileCard 
-                      profile={profile} 
-                      onGenerateIntro={(p) => {
-                        setSelectedProfile(p);
-                        setIsIntroModalOpen(true);
-                      }} 
-                    />
-                  </div>
-                </div>
-              ))
+              <AnimatePresence mode="popLayout">
+                {searchResults.map((profile, i) => (
+                  <motion.div 
+                    key={profile.id} 
+                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: -100, scale: 0.9 }}
+                    transition={{ 
+                      duration: 0.3, 
+                      delay: i * 0.08,
+                      ease: [0.25, 0.46, 0.45, 0.94]
+                    }}
+                    layout
+                    className="border-b border-[#2f3336] hover:bg-white/[0.03] transition-colors cursor-pointer"
+                  >
+                    <div className="p-4">
+                      <ProfileCard 
+                        profile={profile} 
+                        onGenerateIntro={(p) => {
+                          setSelectedProfile(p);
+                          setIsIntroModalOpen(true);
+                        }} 
+                      />
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             ) : (
-              <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col items-center justify-center py-20 px-8 text-center"
+              >
                 <Search className="w-12 h-12 text-[#71767b] mb-4" />
                 <h3 className="text-xl font-bold mb-2">No results found</h3>
                 <p className="text-[#71767b] text-[15px]">
                   Try a different search query
                 </p>
-              </div>
+              </motion.div>
             )}
           </div>
         )}

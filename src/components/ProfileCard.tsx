@@ -22,6 +22,9 @@ export interface Profile {
   degree: 1 | 2 | 3;
   relevantTweet?: string;
   matchReason?: string;
+  matchLevel?: string;
+  aiReason?: string;
+  verifying?: boolean;
   topics?: string[];
 }
 
@@ -107,11 +110,43 @@ export function ProfileCard({ profile, onGenerateIntro }: ProfileCardProps) {
           <span><strong className="text-[#e7e9ea]">{formatCount(profile.following_count)}</strong> following</span>
         </div>
 
-        {/* Match Reason / Insight */}
-        {profile.matchReason && (
-          <div className="mt-3 flex items-start gap-2 text-[13px] p-2 rounded-lg bg-[#1d9bf0]/10 border border-[#1d9bf0]/20">
-            <Sparkles className="w-4 h-4 text-[#1d9bf0] shrink-0 mt-0.5" />
-            <span className="text-[#e7e9ea]">{profile.matchReason}</span>
+        {/* Match Level & AI Insight */}
+        {(profile.matchLevel || profile.aiReason || profile.verifying) && (
+          <div className="mt-3 flex flex-col gap-2">
+            {/* Match Level Badge */}
+            {(profile.matchLevel || profile.verifying) && (
+              <div className="flex items-center gap-2">
+                {profile.verifying ? (
+                  <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#71767b] bg-[#71767b]/10 px-2.5 py-1 rounded-full">
+                    <span className="w-2 h-2 bg-[#71767b] rounded-full animate-pulse" />
+                    Verifying match...
+                  </span>
+                ) : (
+                  <span className={`inline-flex items-center gap-1.5 text-[12px] font-bold px-2.5 py-1 rounded-full ${
+                    profile.matchLevel === "Excellent" ? "bg-[#00ba7c]/20 text-[#00ba7c]" :
+                    profile.matchLevel === "Strong" ? "bg-[#1d9bf0]/20 text-[#1d9bf0]" :
+                    profile.matchLevel === "Good" ? "bg-[#ffd400]/20 text-[#ffd400]" :
+                    "bg-[#71767b]/20 text-[#71767b]"
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full ${
+                      profile.matchLevel === "Excellent" ? "bg-[#00ba7c]" :
+                      profile.matchLevel === "Strong" ? "bg-[#1d9bf0]" :
+                      profile.matchLevel === "Good" ? "bg-[#ffd400]" :
+                      "bg-[#71767b]"
+                    }`} />
+                    {profile.matchLevel} match
+                  </span>
+                )}
+              </div>
+            )}
+            
+            {/* AI Reason */}
+            {profile.aiReason && profile.aiReason.length > 0 && !profile.verifying && (
+              <div className="flex items-start gap-2 text-[13px] p-2.5 rounded-lg bg-gradient-to-r from-[#1d9bf0]/10 to-[#00ba7c]/10 border border-[#1d9bf0]/20">
+                <Sparkles className="w-4 h-4 text-[#1d9bf0] shrink-0 mt-0.5" />
+                <span className="text-[#e7e9ea]">{profile.aiReason}</span>
+              </div>
+            )}
           </div>
         )}
 
