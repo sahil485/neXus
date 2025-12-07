@@ -47,7 +47,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Exchange code for tokens
+    console.log("Exchanging code for tokens...");
     const tokens = await exchangeCodeForTokens(code, codeVerifier);
+    console.log("Token exchange successful");
 
     // Get user info from X API
     const userInfo = await getXUserInfo(tokens.access_token);
@@ -72,6 +74,25 @@ export async function GET(request: NextRequest) {
     // Store session
     await setSession(session);
 
+    // Send user data to backend
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/api/users/upsert`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: userInfo.name,
+          username: userInfo.username,
+          profile_pic: userInfo.profile_image_url,
+          followers: userInfo.public_metrics?.followers_count || 0,
+          following: userInfo.public_metrics?.following_count || 0,
+          oauth_access_token: tokens.access_token,
+        }),
+      });
+    } catch (backendError) {
+      console.error("Failed to sync user to backend:", backendError);
+      // Continue anyway - frontend session is still valid
+    }
+
     // Clear auth cookies
     await clearAuthCookies();
 
@@ -81,6 +102,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Callback error:", error);
+    console.error("Error details:", error instanceof Error ? error.message : String(error));
     return NextResponse.redirect(
       new URL("/?error=callback_failed", process.env.NEXTAUTH_URL || "http://localhost:3000")
     );
