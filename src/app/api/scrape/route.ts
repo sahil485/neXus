@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { inngest } from "@/lib/inngest/client";
 import { getSession } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
@@ -16,28 +15,34 @@ export async function POST(request: NextRequest) {
 
     const { user } = session;
 
-    // Trigger the background scraping job
-    await inngest.send({
-      name: "scrape/network.requested",
-      data: {
-        userId: user.x_user_id,
-        username: user.username,
-        accessToken: session.accessToken,
-        // Note: Twitter API v2 OAuth 2.0 doesn't use accessSecret
-        // You might need to adjust based on your OAuth implementation
-        accessSecret: "", // Leave empty for OAuth 2.0
+    // Call Python backend to generate RAG for user's 1st and 2nd degree connections
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+    const response = await fetch(`${backendUrl}/api/rag/generate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        x_user_id: user.x_user_id,
+      }),
     });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || "Backend scraping failed");
+    }
+
+    const data = await response.json();
 
     return NextResponse.json({
       success: true,
-      message: "Scraping job started in background",
-      username: user.username,
+      message: "Scraping completed with RAG embeddings",
+      ...data,
     });
   } catch (error) {
     console.error("Failed to trigger scraping:", error);
     return NextResponse.json(
-      { error: "Failed to start scraping job" },
+      { error: error instanceof Error ? error.message : "Failed to start scraping job" },
       { status: 500 }
     );
   }

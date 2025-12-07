@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import {
   Home,
   Users,
-  Sparkles,
   Loader2,
   MoreHorizontal,
   LogOut,
@@ -53,7 +52,6 @@ interface NetworkProfile {
 const navItems = [
   { icon: Home, label: "Home", href: "/dashboard", active: false },
   { icon: Users, label: "Network", href: "/network", active: true },
-  { icon: Sparkles, label: "Nexus Search", href: "/dashboard", active: false },
 ];
 
 export default function NetworkPage() {
