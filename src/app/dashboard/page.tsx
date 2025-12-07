@@ -209,27 +209,6 @@ export default function DashboardPage() {
 
         <div className="p-4 border-b border-[#2f3336]">
           <SearchBar onSearch={handleSearch} isLoading={isSearching} />
-          
-          {!hasSearched && (
-            <div className="mt-4">
-              <div className="flex flex-wrap gap-2">
-                {[
-                  "AI researchers",
-                  "People in robotics",
-                  "Climate tech founders",
-                  "Design leaders",
-                ].map((tag) => (
-                  <button
-                    key={tag}
-                    onClick={() => handleSearch(tag)}
-                    className="px-4 py-1.5 rounded-full border border-[#2f3336] text-[#1d9bf0] text-[14px] font-bold hover:bg-[#1d9bf0]/10 transition-colors"
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {hasSearched && (
@@ -270,6 +249,7 @@ export default function DashboardPage() {
         onClose={() => setIsIntroModalOpen(false)}
         profile={selectedProfile}
         currentUser={displayUser}
+        numMutuals={Math.floor(Math.random() * 12) + 1}
       />
     </div>
   );
