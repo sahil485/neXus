@@ -10,8 +10,9 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from nexus.utils import get_db
-from nexus.db.schema import UserDb, XProfile, XConnection, XTweet
+from nexus.db.schema import UserDb, XProfile, XConnection, XPosts
 from nexus.services.twitter_client import TwitterClient
+from nexus.services.scraper import scrape_posts_for_user_network, scrape_connections
 from nexus.services.embeddings import EmbeddingsService
 
 router = APIRouter(tags=["scrape"])
@@ -119,13 +120,13 @@ async def scrape_following(
         raise HTTPException(status_code=500, detail=f"Scraping failed: {str(e)}")
 
 
-@router.post("/tweets/{x_user_id}")
-async def scrape_user_tweets(
+@router.post("/posts/{x_user_id}")
+async def scrape_user_posts(
     x_user_id: str,
     count: int = 50,
     db: AsyncSession = Depends(get_db)
 ):
-    """Scrape recent tweets for a specific user"""
+    """Scrape recent posts for a specific user and store as array of strings"""
     result = await db.execute(
         select(UserDb).where(UserDb.oauth_access_token.isnot(None)).limit(1)
     )
@@ -143,47 +144,81 @@ async def scrape_user_tweets(
         raise HTTPException(status_code=404, detail="Profile not found in database")
 
     if profile.is_protected:
-        return {"success": False, "message": "Cannot fetch tweets from protected account"}
+        return {"success": False, "message": "Cannot fetch posts from protected account"}
 
     client = TwitterClient(app_user.oauth_access_token)
 
     try:
-        tweets = await client.get_user_tweets_batch(x_user_id, count)
+        posts_text = await client.get_user_posts_text(x_user_id, count)
 
-        tweets_added = 0
-        for tweet_data in tweets:
-            stmt = insert(XTweet).values(
-                tweet_id=tweet_data.tweet_id,
-                author_id=tweet_data.author_id,
-                content=tweet_data.content,
-                created_at=tweet_data.created_at,
-                like_count=tweet_data.like_count,
-                retweet_count=tweet_data.retweet_count,
-                reply_count=tweet_data.reply_count,
-                quote_count=tweet_data.quote_count,
-                impression_count=tweet_data.impression_count,
-                language=tweet_data.language,
-                conversation_id=tweet_data.conversation_id,
-                fetched_at=datetime.utcnow()
-            ).on_conflict_do_update(
-                index_elements=['tweet_id'],
-                set_={
-                    'like_count': tweet_data.like_count,
-                    'retweet_count': tweet_data.retweet_count,
-                    'fetched_at': datetime.utcnow()
-                }
-            )
-            await db.execute(stmt)
-            tweets_added += 1
-
+        stmt = insert(XPosts).values(
+            x_user_id=x_user_id,
+            posts=posts_text,
+            discovered_at=datetime.utcnow()
+        ).on_conflict_do_update(
+            index_elements=['x_user_id'],
+            set_={
+                'posts': posts_text,
+                'discovered_at': datetime.utcnow()
+            }
+        )
+        await db.execute(stmt)
         await db.commit()
 
         return {
             "success": True,
-            "tweets_added": tweets_added,
+            "posts_count": len(posts_text),
             "username": profile.username
         }
 
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Tweet scraping failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Posts scraping failed: {str(e)}")
+
+
+@router.post("/scrape/connections/{username}")
+async def scrape_user_connections(username: str, db: AsyncSession = Depends(get_db)):
+    """Scrape all connections (1st and 2nd degree) for a user"""
+    result = await db.execute(
+        select(UserDb).where(UserDb.username == username)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        scrape_result = await scrape_connections(user, db)
+
+        return {
+            "success": True,
+            "message": "Connections scraped successfully",
+            **scrape_result
+        }
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Connection scraping failed: {str(e)}")
+
+
+@router.post("/scrape/posts/{username}")
+async def scrape_network_posts(username: str, db: AsyncSession = Depends(get_db)):
+    """Scrape posts for a user's entire network (1st and 2nd degree)"""
+    result = await db.execute(
+        select(UserDb).where(UserDb.username == username)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        posts_result = await scrape_posts_for_user_network(user, db)
+
+        return {
+            "success": True,
+            "message": "Network posts scraped successfully",
+            **posts_result
+        }
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Posts scraping failed: {str(e)}")

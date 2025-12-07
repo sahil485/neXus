@@ -62,21 +62,12 @@ class XConnection(Base):
     discovered_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
 
-# ============ X Tweets (For content analysis) ============
+# ============ X Posts (Simple posts storage - array of strings) ============
 
-class XTweet(Base):
-    """Tweets for content analysis (global, shared)"""
-    __tablename__ = "x_tweets"
+class XPosts(Base):
+    """Simplified posts storage - just the text content as array"""
+    __tablename__ = "x_posts"
 
-    tweet_id: Mapped[str] = mapped_column(String(50), primary_key=True)
-    author_id: Mapped[str] = mapped_column(String(50), ForeignKey("x_profiles.x_user_id"), index=True)
-    content: Mapped[str] = mapped_column(Text)
-    created_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    like_count: Mapped[int] = mapped_column(BigInteger, default=0)
-    retweet_count: Mapped[int] = mapped_column(BigInteger, default=0)
-    reply_count: Mapped[int] = mapped_column(BigInteger, default=0)
-    quote_count: Mapped[int] = mapped_column(BigInteger, default=0)
-    impression_count: Mapped[int] = mapped_column(BigInteger, default=0)
-    language: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
-    conversation_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    fetched_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    x_user_id: Mapped[str] = mapped_column(String(50), ForeignKey("x_profiles.x_user_id"), primary_key=True)
+    posts: Mapped[List[str]] = mapped_column(ARRAY(Text), default=list)
+    discovered_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
