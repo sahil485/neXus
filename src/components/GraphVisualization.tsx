@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { Loader2, Box, Circle, ZoomOut } from "lucide-react";
+import { Loader2, Box, Circle, ZoomOut, Search, X, Sparkles } from "lucide-react";
 import * as THREE from "three";
 
 // Dynamically import ForceGraph2D with no SSR
@@ -32,6 +32,8 @@ interface GraphNode {
   img: string;
   val: number; // radius size
   degree?: 1 | 2 | 0; // 0 for current user
+  topic?: string;
+  topicColor?: string;
 }
 
 interface GraphLink {
@@ -50,18 +52,36 @@ interface GraphVisualizationProps {
   currentUser: any;
   onNodeClick: (node: GraphNode) => void;
   selectedNodeId?: string | null;
+  topicData?: { user_id: string; topic: string; topic_confidence: number }[];
+  topicColors?: { [key: string]: string };
+  enableTopicMode?: boolean;
 }
 
-export default function GraphVisualization({ profiles, edges, currentUser, onNodeClick, selectedNodeId }: GraphVisualizationProps) {
+export default function GraphVisualization({ profiles, edges, currentUser, onNodeClick, selectedNodeId, topicData = [], topicColors = {}, enableTopicMode = false }: GraphVisualizationProps) {
   const fgRef = useRef<any>(null);
   const [is3D, setIs3D] = useState(false);
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [highlightNodes, setHighlightNodes] = useState(new Set<string>());
   const [highlightLinks, setHighlightLinks] = useState(new Set<string>());
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Set<string>>(new Set());
+  const [isSearching, setIsSearching] = useState(false);
+  const [filteredNodeIds, setFilteredNodeIds] = useState<Set<string> | null>(null);
 
   useEffect(() => {
     if (!currentUser) return;
+    
+    // Create topic lookup map
+    const topicMap = new Map<string, { topic: string; color: string }>();
+    if (enableTopicMode && topicData.length > 0) {
+      topicData.forEach(t => {
+        topicMap.set(t.user_id, {
+          topic: t.topic,
+          color: topicColors[t.topic] || "#6b7280"
+        });
+      });
+    }
     
     // Create nodes
     const nodes: GraphNode[] = [
@@ -72,15 +92,22 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
         img: currentUser.profile_image_url || "",
         val: 20,
         degree: 0,
+        topic: "You",
+        topicColor: "#1d9bf0",
       },
-      ...profiles.map((p) => ({
-        id: p.x_user_id,
-        name: p.name,
-        username: p.username,
-        img: p.profile_image_url,
-        val: p.degree === 1 ? 10 : 5,
-        degree: p.degree,
-      })),
+      ...profiles.map((p) => {
+        const topicInfo = topicMap.get(p.x_user_id);
+        return {
+          id: p.x_user_id,
+          name: p.name,
+          username: p.username,
+          img: p.profile_image_url,
+          val: p.degree === 1 ? 10 : 5,
+          degree: p.degree,
+          topic: topicInfo?.topic,
+          topicColor: topicInfo?.color,
+        };
+      }),
     ];
 
     // Deep clone edges to avoid mutation by the graph library
@@ -99,7 +126,7 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
       nodes: JSON.parse(JSON.stringify(nodes)),
       links: validEdges,
     });
-  }, [profiles, edges, currentUser]);
+  }, [profiles, edges, currentUser, topicData, topicColors, enableTopicMode]);
 
   // Handle highlighting when selection OR hover changes
   useEffect(() => {
@@ -179,22 +206,141 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
     setHighlightLinks(linksToHighlight);
   }, [selectedNodeId, hoveredNode, graphData, currentUser]);
 
+  // Natural language search handler
+  const handleSearch = async () => {
+    if (!searchQuery.trim() || !currentUser) return;
+    
+    setIsSearching(true);
+    try {
+      console.log('🔍 Searching for:', searchQuery);
+      const response = await fetch(`http://localhost:8000/api/graph/search/natural-language`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          x_user_id: currentUser.x_user_id,
+          query: searchQuery,
+          limit: 50
+        })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Search failed:', response.status, errorText);
+        alert(`Search failed: ${response.status}. Check console for details.`);
+        return;
+      }
+      
+      const results = await response.json();
+      console.log('✅ Search results:', results);
+      
+      const resultIds = new Set<string>(results.map((r: any) => r.user_id as string));
+      resultIds.add(currentUser.x_user_id); // Always include current user
+      setSearchResults(resultIds);
+      setFilteredNodeIds(resultIds);
+      
+      if (results.length === 0) {
+        alert('No matches found. Try a different query.');
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      alert(`Search error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Clear search
+  const clearSearch = () => {
+    setSearchQuery("");
+    setSearchResults(new Set());
+    setFilteredNodeIds(null);
+  };
+
+  // Get unique topics for legend
+  const uniqueTopics = useMemo(() => {
+    if (!enableTopicMode) return [];
+    const topics = new Map<string, string>();
+    graphData.nodes.forEach(node => {
+      if (node.topic && node.topicColor && node.topic !== "You") {
+        topics.set(node.topic, node.topicColor);
+      }
+    });
+    return Array.from(topics.entries());
+  }, [graphData, enableTopicMode]);
+
   return (
     <div className="w-full h-full bg-black rounded-lg overflow-hidden border border-[#2f3336] relative">
+      {/* Search Bar */}
+      <div className="absolute top-4 left-4 z-10 pointer-events-auto">
+        <div className="flex items-center gap-2 bg-black/80 backdrop-blur-lg p-2 rounded-lg border border-[#2f3336] shadow-lg">
+          <Search className="w-4 h-4 text-[#71767b]" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            placeholder="Search: 'founders in AI', 'designers'..."
+            className="bg-transparent border-none outline-none text-[#e7e9ea] text-sm placeholder:text-[#71767b] w-64"
+          />
+          {searchQuery && (
+            <button onClick={clearSearch} className="hover:bg-[#2f3336] p-1 rounded transition-colors">
+              <X className="w-4 h-4 text-[#71767b]" />
+            </button>
+          )}
+          <button
+            onClick={handleSearch}
+            disabled={isSearching || !searchQuery.trim()}
+            className="bg-[#1d9bf0] hover:bg-[#1a8cd8] disabled:bg-[#2f3336] text-white px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1"
+          >
+            {isSearching ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <Sparkles className="w-3 h-3" />
+            )}
+            Search
+          </button>
+        </div>
+        {filteredNodeIds && (
+          <div className="mt-2 bg-[#1d9bf0]/10 backdrop-blur-lg p-2 rounded-lg border border-[#1d9bf0]/30 text-xs text-[#e7e9ea]">
+            Found {filteredNodeIds.size - 1} matches
+          </div>
+        )}
+      </div>
+
+      {/* Legend */}
       <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 items-end pointer-events-none">
-        <div className="bg-black/80 p-2 rounded-lg border border-[#2f3336] pointer-events-auto">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-3 h-3 rounded-full bg-[#1d9bf0]"></div>
-            <span className="text-xs text-[#e7e9ea]">You</span>
-          </div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-3 h-3 rounded-full bg-[#00ba7c]"></div>
-            <span className="text-xs text-[#e7e9ea]">1st Degree</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#71767b]"></div>
-            <span className="text-xs text-[#e7e9ea]">2nd Degree</span>
-          </div>
+        <div className="bg-black/80 p-2 rounded-lg border border-[#2f3336] pointer-events-auto max-h-64 overflow-y-auto">
+          {enableTopicMode ? (
+            // Topic mode legend
+            <>
+              <div className="flex items-center gap-2 mb-2 pb-2 border-b border-[#2f3336]">
+                <Sparkles className="w-3 h-3 text-[#1d9bf0]" />
+                <span className="text-xs font-bold text-[#1d9bf0]">Network Pulse</span>
+              </div>
+              {uniqueTopics.slice(0, 8).map(([topic, color]) => (
+                <div key={topic} className="flex items-center gap-2 mb-1">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
+                  <span className="text-xs text-[#e7e9ea]">{topic}</span>
+                </div>
+              ))}
+            </>
+          ) : (
+            // Degree mode legend
+            <>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-3 h-3 rounded-full bg-[#1d9bf0]"></div>
+                <span className="text-xs text-[#e7e9ea]">You</span>
+              </div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-3 h-3 rounded-full bg-[#00ba7c]"></div>
+                <span className="text-xs text-[#e7e9ea]">1st Degree</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#71767b]"></div>
+                <span className="text-xs text-[#e7e9ea]">2nd Degree</span>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex gap-2 pointer-events-auto">
@@ -290,17 +436,23 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
             nodeCanvasObject={(node: any, ctx, globalScale) => {
               const size = node.val;
               
-              // Check highlighting
+              // Check highlighting and filtering
               const isHighlighted = highlightNodes.has(node.id);
-              const isDimmed = highlightNodes.size > 0 && !isHighlighted;
+              const isFiltered = filteredNodeIds ? filteredNodeIds.has(node.id) : true;
+              const isDimmed = (highlightNodes.size > 0 && !isHighlighted) || !isFiltered;
               
               // Apply opacity
-              ctx.globalAlpha = isDimmed ? 0.2 : 1;
+              ctx.globalAlpha = isDimmed ? 0.15 : 1;
   
               // Draw circle border
               ctx.beginPath();
               ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
-              ctx.fillStyle = node.degree === 0 ? "#1d9bf0" : node.degree === 1 ? "#00ba7c" : "#71767b";
+              // Use topic color if enabled, otherwise use degree colors
+              if (enableTopicMode && node.topicColor) {
+                ctx.fillStyle = node.topicColor;
+              } else {
+                ctx.fillStyle = node.degree === 0 ? "#1d9bf0" : node.degree === 1 ? "#00ba7c" : "#71767b";
+              }
               if (isHighlighted && node.degree !== 0) {
                  ctx.shadowColor = "#1d9bf0";
                  ctx.shadowBlur = 15;

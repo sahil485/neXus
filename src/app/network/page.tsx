@@ -66,6 +66,10 @@ export default function NetworkPage() {
   const [viewMode, setViewMode] = useState<"list" | "graph">("list");
   const [selectedProfile, setSelectedProfile] = useState<NetworkProfile | null>(null);
   const [bridgeProfile, setBridgeProfile] = useState<NetworkProfile | null>(null);
+  const [topicMode, setTopicMode] = useState(false);
+  const [topicData, setTopicData] = useState<{ user_id: string; topic: string; topic_confidence: number }[]>([]);
+  const [topicColors, setTopicColors] = useState<{ [key: string]: string }>({});
+  const [loadingTopics, setLoadingTopics] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -94,6 +98,43 @@ export default function NetworkPage() {
       setIsLoading(false);
     }
   };
+
+  const fetchTopicClusters = async () => {
+    if (!user?.x_user_id || topicData.length > 0) return;
+    
+    setLoadingTopics(true);
+    try {
+      // Fetch topic colors first
+      const colorsResponse = await fetch('http://localhost:8000/api/graph/topics/colors');
+      if (colorsResponse.ok) {
+        const colorsData = await colorsResponse.json();
+        setTopicColors(colorsData.colors);
+      }
+
+      // Fetch topic clustering
+      const response = await fetch('http://localhost:8000/api/graph/topics/cluster', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x_user_id: user.x_user_id })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setTopicData(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch topic clusters:', error);
+    } finally {
+      setLoadingTopics(false);
+    }
+  };
+
+  // Fetch topics when topic mode is enabled
+  useEffect(() => {
+    if (topicMode && user?.x_user_id && topicData.length === 0) {
+      fetchTopicClusters();
+    }
+  }, [topicMode, user]);
 
   const handleNodeClick = (node: any) => {
     // Find full profile data from id
@@ -237,6 +278,33 @@ export default function NetworkPage() {
             </button>
           </div>
 
+          {/* Topic Mode Toggle for Graph View */}
+          {viewMode === "graph" && (
+            <div className="flex items-center justify-center p-3 border-b border-[#2f3336] bg-[#16181c]">
+              <button
+                onClick={() => setTopicMode(!topicMode)}
+                disabled={loadingTopics}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all ${
+                  topicMode 
+                    ? "bg-[#1d9bf0] text-white hover:bg-[#1a8cd8]" 
+                    : "bg-[#2f3336] text-[#e7e9ea] hover:bg-[#3f4346]"
+                }`}
+              >
+                {loadingTopics ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                {topicMode ? "Network Pulse ON" : "Enable Network Pulse"}
+              </button>
+              {topicMode && (
+                <span className="ml-3 text-xs text-[#71767b]">
+                  Nodes colored by topic clusters
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Sub-tabs for List View */}
           {viewMode === "list" && (
             <div className="flex border-b border-[#2f3336]">
@@ -347,6 +415,9 @@ export default function NetworkPage() {
               currentUser={displayUser}
               onNodeClick={handleNodeClick}
               selectedNodeId={selectedProfile?.x_user_id}
+              topicData={topicData}
+              topicColors={topicColors}
+              enableTopicMode={topicMode}
             />
           </div>
         )}
