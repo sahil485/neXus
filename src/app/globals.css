@@ -106,7 +106,7 @@
 }
 
 .x-button-hover {
-  @apply hover:bg-opacity-90 transition-opacity duration-200;
+  @apply hover:opacity-90 transition-opacity duration-200;
 }
 
 .x-border {

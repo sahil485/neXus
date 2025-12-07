@@ -285,7 +285,7 @@ export default function DashboardPage() {
                   <Loader2 className="w-4 h-4 text-[#1d9bf0] animate-spin" />
                   <span className="text-[13px] text-[#1d9bf0] font-bold">Indexing Network...</span>
                 </div>
-                <Progress value={indexProgress} className="h-1 bg-[#1d9bf0]/20" indicatorClassName="bg-[#1d9bf0]" />
+                <Progress value={indexProgress} className="h-1 bg-[#1d9bf0]/20" />
               </div>
             </motion.div>
           )}
