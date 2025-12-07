@@ -18,6 +18,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/components/AuthProvider";
 import { useRouter } from "next/navigation";
@@ -48,13 +55,17 @@ const navItems = [
   { icon: Sparkles, label: "Nexus Search", href: "/dashboard", active: false },
 ];
 
+import GraphVisualization from "@/components/GraphVisualization";
+
 export default function NetworkPage() {
   const { user, isLoading: authLoading, logout } = useAuth();
   const router = useRouter();
   
   const [profiles, setProfiles] = useState<NetworkProfile[]>([]);
+  const [edges, setEdges] = useState<{ source: string; target: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"all" | "1st" | "2nd">("all");
+  const [selectedProfile, setSelectedProfile] = useState<NetworkProfile | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -75,11 +86,20 @@ export default function NetworkPage() {
       if (response.ok) {
         const data = await response.json();
         setProfiles(data.profiles || []);
+        setEdges(data.edges || []);
       }
     } catch (error) {
       console.error("Failed to fetch network:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleNodeClick = (node: any) => {
+    // Find full profile data from id
+    const profile = profiles.find(p => p.x_user_id === node.id);
+    if (profile) {
+      setSelectedProfile(profile);
     }
   };
 
@@ -105,9 +125,9 @@ export default function NetworkPage() {
   const secondDegreeCount = profiles.filter(p => p.degree === 2).length;
 
   return (
-    <div className="min-h-screen bg-black text-[#e7e9ea] flex justify-center">
+    <div className="min-h-screen bg-black text-[#e7e9ea] flex">
       {/* Left Sidebar */}
-      <header className="hidden sm:flex flex-col items-end w-[88px] xl:w-[275px] h-screen sticky top-0 px-2">
+      <header className="hidden sm:flex flex-col items-end w-[88px] xl:w-[275px] h-screen sticky top-0 px-2 shrink-0">
         <div className="w-full xl:w-[251px] flex flex-col h-full pb-4">
           <div className="py-2 xl:px-0">
             <div className="w-[50px] h-[50px] flex items-center justify-center hover:bg-white/10 rounded-full cursor-pointer transition-colors">
@@ -158,7 +178,7 @@ export default function NetworkPage() {
       </header>
 
       {/* Main Content */}
-      <main className="w-full max-w-[600px] border-x border-[#2f3336] min-h-screen">
+      <main className="w-full max-w-[600px] border-x border-[#2f3336] min-h-screen shrink-0">
         <div className="sticky top-0 z-50 bg-black/65 backdrop-blur-md border-b border-[#2f3336]">
           <div className="px-4 py-3 flex items-center gap-4">
             <a href="/dashboard" className="hover:bg-white/10 rounded-full p-2 -ml-2 transition-colors">
@@ -257,6 +277,85 @@ export default function NetworkPage() {
           </div>
         )}
       </main>
+
+      {/* Right Column - Graph Visualization */}
+      <div className="hidden lg:block flex-1 h-screen sticky top-0 p-6 overflow-hidden">
+        <div className="h-full flex flex-col">
+          <h2 className="text-xl font-bold mb-4">Network Graph</h2>
+          <div className="flex-1 min-h-0">
+            {isLoading ? (
+              <div className="w-full h-full bg-black rounded-lg border border-[#2f3336] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-[#1d9bf0] animate-spin" />
+              </div>
+            ) : (
+              <GraphVisualization 
+                profiles={profiles} 
+                edges={edges} 
+                currentUser={displayUser}
+                onNodeClick={handleNodeClick}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+
+      <Sheet open={!!selectedProfile} onOpenChange={() => setSelectedProfile(null)}>
+        <SheetContent className="bg-black border-l border-[#2f3336] text-[#e7e9ea] sm:max-w-[400px]">
+          {selectedProfile && (
+            <>
+              <SheetHeader>
+                <SheetTitle className="text-xl font-bold text-[#e7e9ea]">Profile Details</SheetTitle>
+                <SheetDescription className="hidden">Profile information</SheetDescription>
+              </SheetHeader>
+              <div className="mt-6 flex flex-col gap-6">
+                <div className="flex flex-col items-center text-center">
+                  <Avatar className="w-24 h-24 mb-4 border-4 border-black ring-1 ring-[#2f3336]">
+                    <AvatarImage src={selectedProfile.profile_image_url} />
+                    <AvatarFallback>{selectedProfile.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <h2 className="text-xl font-bold">{selectedProfile.name}</h2>
+                  <p className="text-[#71767b]">@{selectedProfile.username}</p>
+                  <Badge 
+                    variant="secondary" 
+                    className={`mt-2 ${
+                      selectedProfile.degree === 1 ? "bg-[#1d9bf0] text-white" : "bg-[#00ba7c] text-white"
+                    }`}
+                  >
+                    {selectedProfile.degree === 1 ? "1st Degree Connection" : "2nd Degree Connection"}
+                  </Badge>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-[#71767b] mb-1">Bio</h3>
+                    <p className="text-[15px]">{selectedProfile.bio || "No bio available"}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-[#16181c] p-3 rounded-xl">
+                      <p className="text-xs text-[#71767b] uppercase tracking-wider mb-1">Followers</p>
+                      <p className="text-lg font-bold">{selectedProfile.followers_count.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-[#16181c] p-3 rounded-xl">
+                      <p className="text-xs text-[#71767b] uppercase tracking-wider mb-1">Following</p>
+                      <p className="text-lg font-bold">{selectedProfile.following_count.toLocaleString()}</p>
+                    </div>
+                  </div>
+
+                  <a 
+                    href={`https://x.com/${selectedProfile.username}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center w-full bg-[#e7e9ea] hover:bg-white text-black font-bold h-[40px] rounded-full transition-colors mt-4"
+                  >
+                    View on X
+                  </a>
+                </div>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

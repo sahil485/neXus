@@ -28,6 +28,7 @@
     "next-auth": "^5.0.0-beta.30",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-force-graph-2d": "^1.29.0",
     "tailwind-merge": "^3.4.0",
     "twitter-api-v2": "^1.28.0"
   },

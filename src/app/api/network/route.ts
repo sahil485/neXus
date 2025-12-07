@@ -33,6 +33,12 @@ export async function GET(request: NextRequest) {
     }
 
     const firstDegreeIds = userConnection?.mutual_ids || [];
+    const edges: { source: string; target: string }[] = [];
+
+    // Add edges from current user to 1st degree connections
+    firstDegreeIds.forEach((id: string) => {
+      edges.push({ source: userId, target: id });
+    });
 
     let firstDegreeProfiles: any[] = [];
     if (firstDegreeIds.length > 0) {
@@ -52,19 +58,25 @@ export async function GET(request: NextRequest) {
     if (firstDegreeIds.length > 0) {
       const { data: secondConnections, error: secondConnError } = await supabase
         .from('x_connections')
-        .select('mutual_ids')
+        .select('x_user_id, mutual_ids')
         .in('x_user_id', firstDegreeIds);
 
       if (!secondConnError && secondConnections) {
         const secondDegreeIds = new Set<string>();
+        
         secondConnections.forEach(conn => {
           if (conn.mutual_ids) {
-            conn.mutual_ids.forEach((id: string) => secondDegreeIds.add(id));
+            conn.mutual_ids.forEach((id: string) => {
+              // Only add if it's not the current user and not already a 1st degree connection
+              // (though 1st degree check is optimization, logic below handles it)
+              if (id !== userId && !firstDegreeIds.includes(id)) {
+                secondDegreeIds.add(id);
+                // Add edge from 1st degree (conn.x_user_id) to 2nd degree (id)
+                edges.push({ source: conn.x_user_id, target: id });
+              }
+            });
           }
         });
-
-        secondDegreeIds.delete(userId);
-        firstDegreeIds.forEach((id: string) => secondDegreeIds.delete(id));
 
         if (secondDegreeIds.size > 0) {
           const secondDegreeArray = Array.from(secondDegreeIds);
@@ -99,6 +111,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       profiles,
+      edges,
       count: {
         first: firstDegreeProfiles.length,
         second: secondDegreeProfiles.length,
