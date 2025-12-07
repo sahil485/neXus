@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
 
     // Send user data to backend
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/api/users/upsert`, {
+      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/api/user/upsert`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

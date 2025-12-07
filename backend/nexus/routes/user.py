@@ -9,7 +9,7 @@ from nexus.db import UserDb
 router = APIRouter(tags=["users"])
 
 
-@router.post("/users/upsert")
+@router.post("/user/upsert")
 async def create_or_update_user(user: User, db: AsyncSession = Depends(get_db)):
     """Store or update user data from OAuth flow"""
     try:
@@ -49,3 +49,18 @@ async def create_or_update_user(user: User, db: AsyncSession = Depends(get_db)):
         print(f"Error: {str(e)}")
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to store user: {str(e)}")
+
+
+@router.get("/user/{username}/token")
+async def get_token_for_user(username: str, db: AsyncSession = Depends(get_db)):
+    """Get OAuth access token for a user by username"""
+    result = await db.execute(select(UserDb).where(UserDb.username == username))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User '{username}' not found")
+
+    return {
+        "username": user.username,
+        "oauth_access_token": user.oauth_access_token,
+    }
