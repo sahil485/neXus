@@ -64,6 +64,21 @@ jobs:
           cd cdk
           npm install
 
+      - name: Bootstrap CDK (if needed)
+        run: |
+          cd cdk
+          npx cdk bootstrap aws://${{ env.AWS_ACCOUNT_ID }}/us-east-1 || true
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+          ENVIRONMENT: prod
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ env.SUPABASE_KEY }}
+          TWITTER_CLIENT_ID: ${{ env.TWITTER_CLIENT_ID }}
+          TWITTER_CLIENT_SECRET: ${{ env.TWITTER_CLIENT_SECRET }}
+          OPENAI_API_KEY: ${{ env.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ env.ANTHROPIC_API_KEY }}
+
       - name: Deploy to prod
         run: |
           cd cdk
