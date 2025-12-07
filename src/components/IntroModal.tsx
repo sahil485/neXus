@@ -21,16 +21,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { XLogo, GrokLogo } from "@/components/ui/logos";
 import type { Profile } from "./ProfileCard";
-
-// X Logo SVG Component
-function XLogo({ className = "w-4 h-4" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
-  );
-}
 
 interface IntroModalProps {
   isOpen: boolean;
@@ -127,33 +119,32 @@ export function IntroModal({
 
         <div className="p-4 space-y-4">
           {/* Profile preview */}
-          <div className="flex items-center gap-3">
-            <Avatar className="w-12 h-12">
-              <AvatarImage src={profile.profile_image_url} alt={profile.name} />
-              <AvatarFallback className="bg-gray-800 text-white font-bold">
-                {profile.name.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-bold truncate">{profile.name}</span>
-                <Badge 
-                  variant="secondary" 
-                  className={`${degree.bgColor} text-white text-xs font-bold px-2 py-0`}
-                >
-                  {degree.label}
-                </Badge>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Avatar className="w-12 h-12">
+                <AvatarImage src={profile.profile_image_url} alt={profile.name} />
+                <AvatarFallback className="bg-gray-800 text-white font-bold">
+                  {profile.name.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold truncate">{profile.name}</span>
+                  <Badge
+                    variant="secondary"
+                    className={`${degree.bgColor} text-white text-xs font-bold px-2 py-0`}
+                  >
+                    {degree.label}
+                  </Badge>
+                </div>
+                <span className="text-sm text-gray-500">@{profile.username}</span>
               </div>
-              <span className="text-sm text-gray-500">@{profile.username}</span>
             </div>
-          </div>
 
-          {/* Mutual connections hint */}
-          <div className="flex items-center gap-2 text-sm text-gray-500 px-1">
-            <Users className="w-4 h-4 text-[#1d9bf0]" />
-            <span>
-              <span className="text-[#1d9bf0] font-medium">3 mutual connections</span>
-            </span>
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <Users className="w-4 h-4 text-[#1d9bf0]" />
+              <span className="text-[#1d9bf0] font-medium">3 mutuals</span>
+            </div>
           </div>
 
           {/* Message editor */}
@@ -167,13 +158,14 @@ export function IntroModal({
                   exit={{ opacity: 0 }}
                   className="h-40 flex items-center justify-center"
                 >
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="relative">
-                      <div className="w-10 h-10 rounded-full border-2 border-white/20 border-t-[#1d9bf0] animate-spin" />
-                      <Sparkles className="w-4 h-4 text-[#1d9bf0] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                    </div>
-                    <p className="text-sm text-gray-500">AI is crafting your message...</p>
-                  </div>
+                  <motion.div
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                  >
+                    <svg fill="currentColor" fillRule="evenodd" height="48" width="48" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="text-[#1d9bf0]">
+                      <path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path>
+                    </svg>
+                  </motion.div>
                 </motion.div>
               ) : (
                 <motion.div
@@ -195,15 +187,13 @@ export function IntroModal({
             </AnimatePresence>
           </div>
 
-          {/* Character count & AI badge */}
-          <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <Sparkles className="w-3 h-3 text-[#1d9bf0]" />
-              <span>Powered by Claude AI</span>
-            </div>
-            
+        </div>
+
+        {/* Actions */}
+        <div className="px-4 py-3 border-t border-white/10 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {/* Character count indicator */}
             <div className="flex items-center gap-2">
-              {/* Circular progress */}
               <div className="relative w-6 h-6">
                 <svg className="w-6 h-6 -rotate-90">
                   <circle
@@ -235,12 +225,7 @@ export function IntroModal({
                 {MAX_CHARS - charCount}
               </span>
             </div>
-          </div>
-        </div>
 
-        {/* Actions */}
-        <div className="px-4 py-3 border-t border-white/10 flex items-center justify-between">
-          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="sm"
@@ -248,8 +233,7 @@ export function IntroModal({
               onClick={handleRegenerate}
               disabled={isGenerating}
             >
-              <RefreshCw className={`w-4 h-4 mr-1.5 ${isGenerating ? "animate-spin" : ""}`} />
-              Regenerate
+              <RefreshCw className={`w-4 h-4 ${isGenerating ? "animate-spin" : ""}`} />
             </Button>
 
             <Button
@@ -265,13 +249,11 @@ export function IntroModal({
             >
               {copied ? (
                 <>
-                  <Check className="w-4 h-4 mr-1.5" />
-                  Copied
+                  <Check className="w-4 h-4" />
                 </>
               ) : (
                 <>
-                  <Copy className="w-4 h-4 mr-1.5" />
-                  Copy
+                  <Copy className="w-4 h-4" />
                 </>
               )}
             </Button>
@@ -282,8 +264,8 @@ export function IntroModal({
             onClick={handleOpenDM}
             disabled={isGenerating || !message || isOverLimit}
           >
-            <XLogo className="w-4 h-4 mr-1.5" />
-            Send on X
+            <p>Send on</p>
+            <XLogo className="w-4 h-4 ml-0" />
           </Button>
         </div>
       </DialogContent>

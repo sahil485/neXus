@@ -25,15 +25,7 @@ import { ProfileCard, type Profile } from "@/components/ProfileCard";
 import { IntroModal } from "@/components/IntroModal";
 import { useAuth } from "@/components/AuthProvider";
 import { useRouter } from "next/navigation";
-
-// X Logo SVG Component
-function XLogo({ className = "w-6 h-6" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
-  );
-}
+import { XLogo } from "@/components/ui/logos";
 
 const navItems = [
   { icon: Home, label: "Home", href: "/dashboard", active: true },
@@ -215,25 +207,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <AnimatePresence>
-          {isIndexing && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="border-b border-[#2f3336] bg-[#1d9bf0]/10 overflow-hidden"
-            >
-              <div className="px-4 py-3">
-                <div className="flex items-center gap-3 mb-2">
-                  <Loader2 className="w-4 h-4 text-[#1d9bf0] animate-spin" />
-                  <span className="text-[13px] text-[#1d9bf0] font-bold">Indexing Network...</span>
-                </div>
-                <Progress value={indexProgress} className="h-1 bg-[#1d9bf0]/20" />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         <div className="p-4 border-b border-[#2f3336]">
           <SearchBar onSearch={handleSearch} isLoading={isSearching} />
           
@@ -259,7 +232,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {hasSearched ? (
+        {hasSearched && (
           <div className="pb-20">
             {isSearching ? (
               <div className="flex justify-center py-8">
@@ -288,22 +261,6 @@ export default function DashboardPage() {
                 </p>
               </div>
             )}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
-            <div className="w-[300px]">
-              <h2 className="text-[31px] font-extrabold mb-2 leading-9">AI-Powered Network Search</h2>
-              <p className="text-[#71767b] text-[15px] mb-8">
-                Search for "people who work in robotics" or "AI researchers at Stanford" using natural language.
-              </p>
-              <Button 
-                onClick={handleStartIndexing}
-                disabled={isIndexing}
-                className="bg-[#1d9bf0] hover:bg-[#1a8cd8] text-white font-bold rounded-full px-8 py-6 text-[17px]"
-              >
-                {isIndexing ? "Indexing..." : "Sync Network"}
-              </Button>
-            </div>
           </div>
         )}
       </main>

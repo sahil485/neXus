@@ -1,12 +1,13 @@
 "use client";
 
-import { 
-  MessageSquare, 
+import {
+  MessageSquare,
   Sparkles,
   ExternalLink,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { XLogo } from "@/components/ui/logos";
 
 export interface Profile {
   id: string;
@@ -115,7 +116,7 @@ export function ProfileCard({ profile, onGenerateIntro }: ProfileCardProps) {
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-3 mt-3">
+        <div className="flex items-center justify-between gap-3 mt-3">
           <button 
             onClick={(e) => {
               e.stopPropagation();
@@ -131,10 +132,10 @@ export function ProfileCard({ profile, onGenerateIntro }: ProfileCardProps) {
             href={profileUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-[#71767b] hover:text-[#e7e9ea] transition-colors px-3 py-1.5 rounded-full hover:bg-white/10"
+            className="flex items-center gap-1.5 bg-white text-black opacity-100 hover:bg-white/90 transition-colors px-4 py-1.5 rounded-full font-bold"
           >
-            <ExternalLink className="w-4 h-4" />
-            <span className="text-[13px] font-medium">View on X</span>
+            <span className="text-[13px] text-black">View on</span>
+            <XLogo className="w-3.5 h-3.5 text-black" />
           </a>
         </div>
       </div>

@@ -29,15 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/components/AuthProvider";
 import { useRouter } from "next/navigation";
 import GraphVisualization from "@/components/GraphVisualization";
-
-// X Logo SVG Component
-function XLogo({ className = "w-6 h-6" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
-  );
-}
+import { XLogo, GrokLogo } from "@/components/ui/logos";
 
 interface NetworkProfile {
   x_user_id: string;
@@ -293,7 +285,7 @@ export default function NetworkPage() {
                 {loadingTopics ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Sparkles className="w-4 h-4" />
+                  <GrokLogo className="w-4 h-4" />
                 )}
                 {topicMode ? "Network Pulse ON" : "Enable Network Pulse"}
               </button>
@@ -491,13 +483,14 @@ export default function NetworkPage() {
                     </div>
                   </div>
 
-                  <a 
+                  <a
                     href={`https://x.com/${selectedProfile.username}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center w-full bg-[#e7e9ea] hover:bg-white text-black font-bold h-[40px] rounded-full transition-colors mt-4"
+                    className="flex items-center justify-center w-full bg-white/100 hover:bg-white/70 font-bold h-[40px] rounded-full transition-colors mt-4 text-black shadow-lg"
                   >
-                    View on X
+                    <span className="text-5 text-black">View on</span>
+                    <XLogo className="w-4 h-4 ml-1 text-black" />
                   </a>
                 </div>
               </div>

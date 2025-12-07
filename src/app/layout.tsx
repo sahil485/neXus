@@ -3,11 +3,8 @@ import { AuthProvider } from "@/components/AuthProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Nexus / X",
+  title: "Nexus",
   description: "AI-Powered Network Explorer for X",
-  icons: {
-    icon: "/favicon.ico",
-  },
 };
 
 export default function RootLayout({
