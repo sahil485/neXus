@@ -82,7 +82,7 @@ export class NexusBackendStack extends Stack {
         ...resources,
         securityGroups: [securityGroup],
         taskImageOptions: {
-          image: ContainerImage.fromTarball(`../nexus-backend:${version}.tar`),
+          image: ContainerImage.fromTarball(`../nexus-backend-${version}.tar`),
           containerName: CONTAINER_NAME,
           containerPort: 8000,
           enableLogging: true,

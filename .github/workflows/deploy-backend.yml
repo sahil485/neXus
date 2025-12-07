@@ -56,8 +56,8 @@ jobs:
       - name: Build Docker image
         run: |
           cd backend
-          docker build -t nexus-backend:0.0.1 .
-          docker save nexus-backend:0.0.1 -o ../nexus-backend:0.0.1.tar
+          docker build -t nexus-backend:${{ steps.get_version.outputs.version }} .
+          docker save nexus-backend:${{ steps.get_version.outputs.version }} -o ../nexus-backend-${{ steps.get_version.outputs.version }}.tar
 
       - name: Install CDK dependencies
         run: |
