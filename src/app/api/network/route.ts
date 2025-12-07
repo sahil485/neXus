@@ -21,78 +21,87 @@ export async function GET(request: NextRequest) {
 
     const userId = session.user.x_user_id;
 
-    // Fetch 1st degree connections
-    const { data: firstDegree, error: firstError } = await supabase
+    // Fetch 1st degree connections (mutual_ids from x_connections)
+    const { data: userConnection, error: connError } = await supabase
       .from('x_connections')
-      .select(`
-        following_id,
-        x_profiles!x_connections_following_id_fkey (
-          x_user_id,
-          username,
-          name,
-          bio,
-          profile_image_url,
-          followers_count,
-          following_count
-        )
-      `)
-      .eq('follower_id', userId)
-      .limit(100);
+      .select('mutual_ids')
+      .eq('x_user_id', userId)
+      .single();
 
-    if (firstError) {
-      console.error("Error fetching 1st degree:", firstError);
+    if (connError) {
+      console.error("Error fetching connections:", connError);
     }
 
-    // Fetch 2nd degree connections
-    // Get who the 1st degree connections follow
-    const firstDegreeIds = firstDegree?.map((c: any) => c.following_id) || [];
-    
-    let secondDegree: any[] = [];
-    if (firstDegreeIds.length > 0) {
-      const { data, error: secondError } = await supabase
-        .from('x_connections')
-        .select(`
-          following_id,
-          x_profiles!x_connections_following_id_fkey (
-            x_user_id,
-            username,
-            name,
-            bio,
-            profile_image_url,
-            followers_count,
-            following_count
-          )
-        `)
-        .in('follower_id', firstDegreeIds)
-        .not('following_id', 'eq', userId) // Exclude the current user
-        .not('following_id', 'in', `(${firstDegreeIds.join(',')})`) // Exclude 1st degree
-        .limit(200);
+    const firstDegreeIds = userConnection?.mutual_ids || [];
 
-      if (secondError) {
-        console.error("Error fetching 2nd degree:", secondError);
+    let firstDegreeProfiles: any[] = [];
+    if (firstDegreeIds.length > 0) {
+      const { data, error: profileError } = await supabase
+        .from('x_profiles')
+        .select('x_user_id, username, name, bio, profile_image_url, followers_count, following_count')
+        .in('x_user_id', firstDegreeIds);
+
+      if (profileError) {
+        console.error("Error fetching 1st degree profiles:", profileError);
       } else {
-        secondDegree = data || [];
+        firstDegreeProfiles = data || [];
       }
     }
 
-    // Format profiles
+    let secondDegreeProfiles: any[] = [];
+    if (firstDegreeIds.length > 0) {
+      const { data: secondConnections, error: secondConnError } = await supabase
+        .from('x_connections')
+        .select('mutual_ids')
+        .in('x_user_id', firstDegreeIds);
+
+      if (!secondConnError && secondConnections) {
+        const secondDegreeIds = new Set<string>();
+        secondConnections.forEach(conn => {
+          if (conn.mutual_ids) {
+            conn.mutual_ids.forEach((id: string) => secondDegreeIds.add(id));
+          }
+        });
+
+        secondDegreeIds.delete(userId);
+        firstDegreeIds.forEach((id: string) => secondDegreeIds.delete(id));
+
+        if (secondDegreeIds.size > 0) {
+          const secondDegreeArray = Array.from(secondDegreeIds);
+          const batchSize = 500;
+          const batches = [];
+
+          for (let i = 0; i < secondDegreeArray.length; i += batchSize) {
+            batches.push(secondDegreeArray.slice(i, i + batchSize));
+          }
+
+          for (const batch of batches.slice(0, 2)) { // Limit to first 2 batches (1000 profiles max)
+            const { data, error: secondProfileError } = await supabase
+              .from('x_profiles')
+              .select('x_user_id, username, name, bio, profile_image_url, followers_count, following_count')
+              .in('x_user_id', batch);
+
+            if (secondProfileError) {
+              console.error("Error fetching 2nd degree profiles:", secondProfileError);
+            } else if (data) {
+              secondDegreeProfiles.push(...data);
+            }
+          }
+        }
+      }
+    }
+
     const profiles = [
-      ...(firstDegree?.map((c: any) => ({
-        ...c.x_profiles,
-        degree: 1,
-      })) || []),
-      ...(secondDegree?.map((c: any) => ({
-        ...c.x_profiles,
-        degree: 2,
-      })) || []),
-    ].filter(p => p.x_user_id); // Remove any null profiles
+      ...firstDegreeProfiles.map(p => ({ ...p, degree: 1 })),
+      ...secondDegreeProfiles.map(p => ({ ...p, degree: 2 })),
+    ];
 
     return NextResponse.json({
       success: true,
       profiles,
       count: {
-        first: firstDegree?.length || 0,
-        second: secondDegree?.length || 0,
+        first: firstDegreeProfiles.length,
+        second: secondDegreeProfiles.length,
         total: profiles.length,
       },
     });
