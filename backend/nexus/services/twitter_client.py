@@ -2,8 +2,10 @@ import httpx
 import logging
 from typing import Optional, List, Dict, Union
 from datetime import datetime
+from asyncio import sleep
 from nexus.models.x_profile import XProfileCreate
 from nexus.models.x_tweet import XTweetCreate
+from nexus.utils.rate_limiter import x_api_rate_limiter
 
 logger = logging.getLogger(__name__)
 
@@ -33,37 +35,91 @@ class TwitterClient:
         self,
         method: str,
         endpoint: str,
-        params: Optional[Dict[str, Union[str, int]]] = None
+        params: Optional[Dict[str, Union[str, int]]] = None,
+        max_retries: int = 3
     ) -> Dict[str, Union[str, int, List, Dict]]:
+        """
+        Make an HTTP request to X API with rate limiting and retry logic.
+        
+        Args:
+            method: HTTP method
+            endpoint: API endpoint
+            params: Query parameters
+            max_retries: Maximum number of retry attempts
+        """
         url = f"{self.BASE_URL}{endpoint}"
 
-        async with httpx.AsyncClient() as client:
+        for attempt in range(max_retries):
             try:
-                response = await client.request(
-                    method=method,
-                    url=url,
-                    headers=self.headers,
-                    params=params,
-                    timeout=30.0
-                )
+                # RATE LIMITING: Acquire token before making request
+                await x_api_rate_limiter.acquire()
+                
+                async with httpx.AsyncClient() as client:
+                    response = await client.request(
+                        method=method,
+                        url=url,
+                        headers=self.headers,
+                        params=params,
+                        timeout=30.0
+                    )
 
-                if response.status_code == 429:
-                    reset_time = response.headers.get("x-rate-limit-reset")
-                    logger.warning(f"⏱️  RATE LIMITED on {endpoint}. Resets at: {reset_time}")
-                    raise Exception(f"Rate limited. Resets at: {reset_time}")
+                    # Handle 429 rate limit errors
+                    if response.status_code == 429:
+                        reset_time = response.headers.get("x-rate-limit-reset")
+                        logger.warning(
+                            f"⏱️  RATE LIMITED on {endpoint} (attempt {attempt + 1}/{max_retries}). "
+                            f"Resets at: {reset_time}"
+                        )
+                        
+                        if attempt < max_retries - 1:
+                            # Wait 15 minutes before retry
+                            wait_time = 900  
+                            logger.info(f"Waiting {wait_time}s before retry...")
+                            await sleep(wait_time)
+                            continue
+                        else:
+                            raise Exception(f"Rate limited after {max_retries} attempts")
 
-                response.raise_for_status()
-                logger.info(f"✅ Success: {method} {endpoint} (status: {response.status_code})")
-                return response.json()
+                    response.raise_for_status()
+                    logger.debug(f"✅ Success: {method} {endpoint} (status: {response.status_code})")
+                    return response.json()
+                    
             except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429:
+                    # Already handled above
+                    continue
+                
                 logger.error(f"❌ HTTP Error {e.response.status_code} on {endpoint}: {e.response.text}")
+                
+                if attempt < max_retries - 1:
+                    # Exponential backoff for other errors
+                    wait_time = 2 ** attempt
+                    logger.info(f"Retrying in {wait_time}s...")
+                    await sleep(wait_time)
+                    continue
                 raise
+                
             except httpx.TimeoutException:
                 logger.error(f"⏰ Timeout on {endpoint}")
+                
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt
+                    logger.info(f"Retrying in {wait_time}s...")
+                    await sleep(wait_time)
+                    continue
                 raise
+                
             except Exception as e:
                 logger.error(f"❌ Request failed on {endpoint}: {str(e)}")
+                
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt
+                    logger.info(f"Retrying in {wait_time}s...")
+                    await sleep(wait_time)
+                    continue
                 raise
+        
+        raise Exception(f"Request failed after {max_retries} attempts")
 
     async def get_me(self) -> XProfileCreate:
         params = {"user.fields": ",".join(self.USER_FIELDS)}

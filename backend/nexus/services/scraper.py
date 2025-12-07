@@ -14,9 +14,14 @@ from nexus.db.schema import UserDb, XProfile, XConnection, XPosts
 from nexus.services.twitter_client import TwitterClient
 from nexus.services.embeddings import EmbeddingsService
 from nexus.models.x_profile import XProfileCreate
-from nexus.services.twitter_client import TwitterClient
+from nexus.utils.staleness import should_refresh_posts, should_refresh_profile
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
+
+# Phase 1 Optimization Limits
+MAX_SECOND_DEGREE_PROFILES = 100  # Limit 2nd degree expansion
+MIN_FOLLOWERS_FOR_POSTS = 50  # Skip low-value profiles for posts
 
 
 async def retrieve_connections(x_user_id: str) -> dict:
@@ -27,9 +32,9 @@ async def retrieve_connections(x_user_id: str) -> dict:
 
     client = TwitterClient(bearer_token)
 
-    following = await client.get_all_following(x_user_id, 10)
-
-    followers = await client.get_all_followers(x_user_id, 10)
+    # Fetch ALL following/followers (pagination handled by client)
+    following = await client.get_all_following(x_user_id)
+    followers = await client.get_all_followers(x_user_id)
 
     following_ids = {profile.x_user_id for profile in following}
     followers_ids = {profile.x_user_id for profile in followers}
@@ -56,13 +61,34 @@ async def scrape_posts_for_profiles(profiles: List[XProfile], db: AsyncSession) 
 
     client = TwitterClient(bearer_token)
     posts_added = 0
+    skipped_fresh = 0
+    skipped_protected = 0
+    skipped_low_value = 0
     total = len(profiles)
     logger.info(f"📝 Starting posts scraping for {total} profiles...")
 
     for idx, profile in enumerate(profiles, 1):
-        # Skip protected accounts
+        # Skip protected accounts (can't access anyway)
         if profile.is_protected:
             logger.debug(f"  ⏭️  Skipping protected account @{profile.username} ({idx}/{total})")
+            skipped_protected += 1
+            continue
+        
+        # Skip low-value profiles (few followers = less valuable signal)
+        if profile.followers_count < MIN_FOLLOWERS_FOR_POSTS:
+            logger.debug(f"  ⏭️  Skipping low-follower account @{profile.username} ({profile.followers_count} followers)")
+            skipped_low_value += 1
+            continue
+        
+        # Check if posts are fresh (staleness check)
+        existing_posts = await db.execute(
+            select(XPosts).where(XPosts.x_user_id == profile.x_user_id)
+        )
+        posts_record = existing_posts.scalar_one_or_none()
+        
+        if posts_record and not should_refresh_posts(posts_record.discovered_at):
+            logger.debug(f"  ⏭️  Skipping fresh posts for @{profile.username}")
+            skipped_fresh += 1
             continue
 
         try:
@@ -85,12 +111,18 @@ async def scrape_posts_for_profiles(profiles: List[XProfile], db: AsyncSession) 
                 posts_added += 1
         except Exception as e:
             logger.warning(f"  ⚠️  Failed to scrape posts for @{profile.username}: {str(e)}")
+            # Rollback transaction to prevent "current transaction is aborted" errors
+            await db.rollback()
             continue
 
     # Commit all the post inserts to database
     logger.info(f"💾 Committing {posts_added} post records to database...")
     await db.commit()
-    logger.info(f"✅ DATABASE COMMIT SUCCESS: {posts_added}/{total} profiles with posts saved to DB")
+    logger.info(
+        f"✅ Posts scraping complete: {posts_added} scraped, "
+        f"{skipped_fresh} fresh, {skipped_protected} protected, "
+        f"{skipped_low_value} low-value (total: {total})"
+    )
     return posts_added
 
 
@@ -168,12 +200,26 @@ async def scrape_connections(user: UserDb, db: AsyncSession) -> dict:
     print(f"Added {profiles_added} 1st degree profiles")
 
     # Step 2: Get 2nd degree connections in parallel batches
-    print("Fetching 2nd degree connections in parallel...")
+    # OPTIMIZATION: Limit 2nd degree to avoid explosion
+    logger.info(f"Fetching 2nd degree connections (limited to top {MAX_SECOND_DEGREE_PROFILES})...")
     second_degree_mutuals = []
+    
+    # Sort 1st degree by followers (prioritize influential connections)
+    sorted_mutuals = sorted(
+        connections_data["mutual"], 
+        key=lambda p: p.followers_count, 
+        reverse=True
+    )
+    limited_mutuals = sorted_mutuals[:MAX_SECOND_DEGREE_PROFILES]
+    
+    logger.info(
+        f"Limited 2nd degree expansion: processing top {len(limited_mutuals)} "
+        f"of {len(connections_data['mutual'])} 1st degree connections"
+    )
     
     async def process_mutual(mutual_profile, idx, total):
         """Process one mutual connection's network"""
-        print(f"Processing {idx}/{total}: @{mutual_profile.username}")
+        logger.info(f"Processing {idx}/{total}: @{mutual_profile.username}")
         try:
             mutual_connections_data = await retrieve_connections(mutual_profile.x_user_id)
             filtered_mutuals = [
@@ -183,24 +229,24 @@ async def scrape_connections(user: UserDb, db: AsyncSession) -> dict:
             await add_to_db(mutual_profile.x_user_id, filtered_mutuals, db)
             return filtered_mutuals
         except Exception as e:
-            print(f"Error processing @{mutual_profile.username}: {e}")
+            logger.warning(f"Error processing @{mutual_profile.username}: {e}")
             return []
     
     # Process in parallel batches of 5
     batch_size = 5
-    total_mutuals = len(connections_data["mutual"])
+    total_to_process = len(limited_mutuals)
     
-    for i in range(0, total_mutuals, batch_size):
-        batch = connections_data["mutual"][i:i + batch_size]
-        tasks = [process_mutual(mutual, i + idx + 1, total_mutuals) for idx, mutual in enumerate(batch)]
+    for i in range(0, total_to_process, batch_size):
+        batch = limited_mutuals[i:i + batch_size]
+        tasks = [process_mutual(mutual, i + idx + 1, total_to_process) for idx, mutual in enumerate(batch)]
         batch_results = await asyncio.gather(*tasks)
         
         for result in batch_results:
             second_degree_mutuals.extend(result)
         
-        print(f"Batch {i//batch_size + 1} complete. 2nd degree so far: {len(second_degree_mutuals)}")
+        logger.info(f"Batch {i//batch_size + 1} complete. 2nd degree so far: {len(second_degree_mutuals)}")
     
-    print(f"Added {len(second_degree_mutuals)} 2nd degree profiles")
+    logger.info(f"Added {len(second_degree_mutuals)} 2nd degree profiles")
 
     # Step 3: Generate RAG embeddings
     print("Starting RAG ingestion...")
