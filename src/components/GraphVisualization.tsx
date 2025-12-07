@@ -222,7 +222,8 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
     setIsSearching(true);
     try {
       console.log('🔍 Searching for:', searchQuery);
-      const response = await fetch(`http://localhost:8000/api/graph/search/natural-language`, {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+      const response = await fetch(`${backendUrl}/api/graph/search/natural-language`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
