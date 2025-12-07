@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from nexus.routes import health, items, user, network
+from nexus.routes import health, items, user, network, profiles, scrape, tweets
 from nexus.db import engine
 from nexus.init_db import init
 
@@ -36,7 +36,10 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(items.router, prefix="/api")
 app.include_router(user.router, prefix="/api")
+app.include_router(profiles.router, prefix="/api")
 app.include_router(network.router, prefix="/api")
+app.include_router(scrape.router, prefix="/api")
+app.include_router(tweets.router, prefix="/api")
 
 @app.get("/")
 async def root():
