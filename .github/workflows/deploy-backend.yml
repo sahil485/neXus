@@ -1,0 +1,78 @@
+name: Deploy Nexus Backend
+
+on:
+  pull_request:
+    branches:
+      - main
+    tags:
+      - "backend@*"
+
+jobs:
+  deploy-prod:
+    if: contains(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    environment: Production
+    env:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      TWITTER_CLIENT_ID: ${{ secrets.TWITTER_CLIENT_ID }}
+      TWITTER_CLIENT_SECRET: ${{ secrets.TWITTER_CLIENT_SECRET }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/backend@}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Deploying version: $VERSION"
+
+      - name: Create .env file
+        run: |
+          cd backend
+          echo "DATABASE_URL=${{ env.DATABASE_URL }}" >> .env
+          echo "SUPABASE_URL=${{ env.SUPABASE_URL }}" >> .env
+          echo "SUPABASE_KEY=${{ env.SUPABASE_KEY }}" >> .env
+          echo "TWITTER_CLIENT_ID=${{ env.TWITTER_CLIENT_ID }}" >> .env
+          echo "TWITTER_CLIENT_SECRET=${{ env.TWITTER_CLIENT_SECRET }}" >> .env
+          echo "OPENAI_API_KEY=${{ env.OPENAI_API_KEY }}" >> .env
+          echo "ANTHROPIC_API_KEY=${{ env.ANTHROPIC_API_KEY }}" >> .env
+
+      - name: Build Docker image
+        run: |
+          cd backend
+          docker build -t nexus-backend:${{ steps.get_version.outputs.version }} .
+          docker save nexus-backend:${{ steps.get_version.outputs.version }} -o ../nexus-backend:${{ steps.get_version.outputs.version }}.tar
+
+      - name: Install CDK dependencies
+        run: |
+          cd cdk
+          npm install
+
+      - name: Deploy to prod
+        run: |
+          cd cdk
+          VERSION="${{ steps.get_version.outputs.version }}" npm run cdk deploy nexus-backend-prod --require-approval never --progress events
+
+      - name: Deployment Summary
+        run: |
+          echo "### Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** Production" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ steps.get_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Git SHA:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
