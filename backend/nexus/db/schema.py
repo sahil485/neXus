@@ -14,8 +14,7 @@ class UserDb(Base):
     """App users - people who OAuth with our app"""
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    x_user_id: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=True)  # Twitter's user ID
+    x_user_id: Mapped[str] = mapped_column(String(50), primary_key=True)  # Twitter's user ID
     name: Mapped[str]
     username: Mapped[str] = mapped_column(unique=True, index=True)
     profile_pic: Mapped[str]

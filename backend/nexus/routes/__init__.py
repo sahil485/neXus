@@ -1,4 +1,4 @@
 # Routes package
-from nexus.routes import health, items, followers, network
+from nexus.routes import health, items, user, network
 
-__all__ = ["health", "items", "followers", "network"]
+__all__ = ["health", "items", "user", "network"]
