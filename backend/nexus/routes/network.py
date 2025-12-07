@@ -16,7 +16,7 @@ router = APIRouter(tags=["network"])
 
 @router.get("/network/{username}/first-degree", response_model=List[XProfileResponse])
 async def get_first_degree(username: str, db: AsyncSession = Depends(get_db)):
-    """Get 1st degree connections (people the user follows)"""
+    """Get 1st degree connections (mutual connections from x_connections table)"""
     user_result = await db.execute(
         select(UserDb).where(UserDb.username == username)
     )
@@ -28,10 +28,20 @@ async def get_first_degree(username: str, db: AsyncSession = Depends(get_db)):
     if not user.x_user_id:
         raise HTTPException(status_code=400, detail="User has no Twitter ID linked")
 
+    # Get the mutual_ids array from x_connections
+    connection_result = await db.execute(
+        select(XConnection.mutual_ids)
+        .where(XConnection.x_user_id == user.x_user_id)
+    )
+    mutual_ids = connection_result.scalar_one_or_none()
+
+    if not mutual_ids:
+        return []
+
+    # Get all profiles for these mutual IDs
     result = await db.execute(
         select(XProfile)
-        .join(XConnection, XConnection.following_id == XProfile.x_user_id)
-        .where(XConnection.follower_id == user.x_user_id)
+        .where(XProfile.x_user_id.in_(mutual_ids))
     )
 
     return result.scalars().all()
@@ -43,7 +53,7 @@ async def get_second_degree(
     limit: int = 100,
     db: AsyncSession = Depends(get_db)
 ):
-    """Get 2nd degree connections (people that 1st degree follows, excluding 1st degree)"""
+    """Get 2nd degree connections (mutuals of mutuals, excluding 1st degree and self)"""
     user_result = await db.execute(
         select(UserDb).where(UserDb.username == username)
     )
@@ -55,22 +65,39 @@ async def get_second_degree(
     if not user.x_user_id:
         raise HTTPException(status_code=400, detail="User has no Twitter ID linked")
 
-    # Subquery for 1st degree user IDs
-    first_degree_subq = (
-        select(XConnection.following_id)
-        .where(XConnection.follower_id == user.x_user_id)
-    ).subquery()
+    # Get 1st degree mutual_ids
+    first_degree_result = await db.execute(
+        select(XConnection.mutual_ids)
+        .where(XConnection.x_user_id == user.x_user_id)
+    )
+    first_degree_ids = first_degree_result.scalar_one_or_none()
 
-    # Get 2nd degree: people that 1st degree follows, excluding 1st degree themselves
+    if not first_degree_ids:
+        return []
+
+    # Get all mutual_ids from each 1st degree connection
+    second_degree_result = await db.execute(
+        select(XConnection.mutual_ids)
+        .where(XConnection.x_user_id.in_(first_degree_ids))
+    )
+
+    # Flatten and deduplicate all 2nd degree IDs
+    second_degree_ids = set()
+    for row in second_degree_result.scalars().all():
+        if row:
+            second_degree_ids.update(row)
+
+    # Exclude self and 1st degree connections
+    second_degree_ids.discard(user.x_user_id)
+    second_degree_ids = second_degree_ids - set(first_degree_ids)
+
+    if not second_degree_ids:
+        return []
+
+    # Get profiles for 2nd degree connections
     result = await db.execute(
         select(XProfile)
-        .join(XConnection, XConnection.following_id == XProfile.x_user_id)
-        .where(
-            XConnection.follower_id.in_(select(first_degree_subq)),
-            ~XProfile.x_user_id.in_(select(first_degree_subq)),
-            XProfile.x_user_id != user.x_user_id
-        )
-        .distinct()
+        .where(XProfile.x_user_id.in_(list(second_degree_ids)))
         .limit(limit)
     )
 
@@ -90,11 +117,13 @@ async def get_network_stats(username: str, db: AsyncSession = Depends(get_db)):
 
     first_count = 0
     if user.x_user_id:
-        first_degree_count = await db.execute(
-            select(func.count(XConnection.id))
-            .where(XConnection.follower_id == user.x_user_id)
+        # Get count of mutual_ids in x_connections
+        connection_result = await db.execute(
+            select(XConnection.mutual_ids)
+            .where(XConnection.x_user_id == user.x_user_id)
         )
-        first_count = first_degree_count.scalar() or 0
+        mutual_ids = connection_result.scalar_one_or_none()
+        first_count = len(mutual_ids) if mutual_ids else 0
 
     profiles_count = await db.execute(select(func.count(XProfile.x_user_id)))
     tweets_count = await db.execute(select(func.count(XTweet.tweet_id)))

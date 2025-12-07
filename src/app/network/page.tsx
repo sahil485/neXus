@@ -165,7 +165,7 @@ export default function NetworkPage() {
               <ArrowLeft className="w-5 h-5" />
             </a>
             <div>
-              <h1 className="text-xl font-bold">Your Network</h1>
+              <h1 className="text-xl font-bold">Your Extended Network</h1>
               <p className="text-[13px] text-[#71767b]">{profiles.length} connections</p>
             </div>
           </div>
