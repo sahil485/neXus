@@ -38,7 +38,7 @@ jobs:
       - name: Get version from tag
         id: get_version
         run: |
-          VERSION="${GITHUB_REF#refs/tags/backend@}"
+          VERSION="0.0.1"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Deploying version: $VERSION"
 
