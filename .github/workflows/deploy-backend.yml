@@ -4,12 +4,12 @@ on:
   pull_request:
     branches:
       - main
-    tags:
-      - "backend@*"
+    # tags:
+    #   - "backend@*"
 
 jobs:
   deploy-prod:
-    if: contains(github.ref, 'refs/tags/')
+    # if: contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     environment: Production
     env:
@@ -56,8 +56,8 @@ jobs:
       - name: Build Docker image
         run: |
           cd backend
-          docker build -t nexus-backend:${{ steps.get_version.outputs.version }} .
-          docker save nexus-backend:${{ steps.get_version.outputs.version }} -o ../nexus-backend:${{ steps.get_version.outputs.version }}.tar
+          docker build -t nexus-backend:0.0.1 .
+          docker save nexus-backend:0.0.1 -o ../nexus-backend:0.0.1.tar
 
       - name: Install CDK dependencies
         run: |
@@ -67,12 +67,12 @@ jobs:
       - name: Deploy to prod
         run: |
           cd cdk
-          VERSION="${{ steps.get_version.outputs.version }}" npm run cdk deploy nexus-backend-prod --require-approval never --progress events
+          npm run cdk deploy nexus-backend-prod --require-approval never --progress events
 
       - name: Deployment Summary
         run: |
           echo "### Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Environment:** Production" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version:** ${{ steps.get_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** 0.0.1" >> $GITHUB_STEP_SUMMARY
           echo "- **Git SHA:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
