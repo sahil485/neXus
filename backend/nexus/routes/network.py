@@ -8,7 +8,7 @@ from sqlalchemy import select, func
 from typing import List
 
 from nexus.utils import get_db
-from nexus.db.schema import UserDb, XProfile, XFollow, XTweet
+from nexus.db.schema import UserDb, XProfile, XConnection, XTweet
 from nexus.models import XProfileResponse, NetworkStats
 
 router = APIRouter(tags=["network"])
@@ -30,8 +30,8 @@ async def get_first_degree(username: str, db: AsyncSession = Depends(get_db)):
 
     result = await db.execute(
         select(XProfile)
-        .join(XFollow, XFollow.following_id == XProfile.x_user_id)
-        .where(XFollow.follower_id == user.x_user_id)
+        .join(XConnection, XConnection.following_id == XProfile.x_user_id)
+        .where(XConnection.follower_id == user.x_user_id)
     )
 
     return result.scalars().all()
@@ -57,16 +57,16 @@ async def get_second_degree(
 
     # Subquery for 1st degree user IDs
     first_degree_subq = (
-        select(XFollow.following_id)
-        .where(XFollow.follower_id == user.x_user_id)
+        select(XConnection.following_id)
+        .where(XConnection.follower_id == user.x_user_id)
     ).subquery()
 
     # Get 2nd degree: people that 1st degree follows, excluding 1st degree themselves
     result = await db.execute(
         select(XProfile)
-        .join(XFollow, XFollow.following_id == XProfile.x_user_id)
+        .join(XConnection, XConnection.following_id == XProfile.x_user_id)
         .where(
-            XFollow.follower_id.in_(select(first_degree_subq)),
+            XConnection.follower_id.in_(select(first_degree_subq)),
             ~XProfile.x_user_id.in_(select(first_degree_subq)),
             XProfile.x_user_id != user.x_user_id
         )
@@ -91,8 +91,8 @@ async def get_network_stats(username: str, db: AsyncSession = Depends(get_db)):
     first_count = 0
     if user.x_user_id:
         first_degree_count = await db.execute(
-            select(func.count(XFollow.id))
-            .where(XFollow.follower_id == user.x_user_id)
+            select(func.count(XConnection.id))
+            .where(XConnection.follower_id == user.x_user_id)
         )
         first_count = first_degree_count.scalar() or 0
 

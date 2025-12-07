@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import insert
 from datetime import datetime
 
 from nexus.utils import get_db
-from nexus.db.schema import UserDb, XProfile, XFollow, XTweet
+from nexus.db.schema import UserDb, XProfile, XConnection, XTweet
 from nexus.services.twitter_client import TwitterClient
 
 router = APIRouter(tags=["scrape"])
@@ -72,7 +72,7 @@ async def scrape_following(username: str, db: AsyncSession = Depends(get_db)):
             profiles_added += 1
 
             # Add follow relationship
-            follow_stmt = insert(XFollow).values(
+            follow_stmt = insert(XConnection).values(
                 follower_id=user.x_user_id,
                 following_id=profile_data.x_user_id,
                 discovered_at=datetime.utcnow()

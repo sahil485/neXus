@@ -3,10 +3,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from datetime import datetime
-import httpx
 from nexus.utils import get_db
 from nexus.models import User
-from nexus.db import UserDb, XProfile
+from nexus.db import UserDb, XProfile, async_session_maker
+from nexus.services.scraper import retrieve_connections
+from nexus.services.twitter_client import TwitterClient
+
 
 router = APIRouter(tags=["users"])
 
@@ -15,22 +17,14 @@ router = APIRouter(tags=["users"])
 async def create_or_update_user(user: User, db: AsyncSession = Depends(get_db)):
     """Store or update user data from OAuth flow"""
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                "https://api.x.com/2/users/me",
-                headers={"Authorization": f"Bearer {user.oauth_access_token}"}
-            )
-
-            if response.status_code != 200:
-                raise HTTPException(status_code=400, detail="Failed to fetch user data from X API")
-
-            x_data = response.json()
-            x_user_id = x_data["data"]["id"]
+        client = TwitterClient(user.oauth_access_token)
+        me_profile = await client.get_me()
+        x_user_id = me_profile.x_user_id
 
         print(f"Upserting user: {user.username} (X ID: {x_user_id})")
         result = await db.execute(select(UserDb).where(UserDb.x_user_id == x_user_id))
         existing = result.scalar_one_or_none()
-
+        new_user = False
         if existing:
             existing.name = user.name
             existing.username = user.username
@@ -40,6 +34,7 @@ async def create_or_update_user(user: User, db: AsyncSession = Depends(get_db)):
             existing.oauth_access_token = user.oauth_access_token
             existing.updated_at = datetime.utcnow()
         else:
+            new_user = True
             new_user = UserDb(
                 x_user_id=x_user_id,
                 name=user.name,
@@ -70,13 +65,24 @@ async def create_or_update_user(user: User, db: AsyncSession = Depends(get_db)):
             }
         )
         await db.execute(profile_stmt)
-
         await db.commit()
+        if new_user:
+            print(f"New user {user.username}, triggering background scrape...")
+            try:
+                async with async_session_maker() as scrape_session:
+                    result = await scrape_session.execute(select(UserDb).where(UserDb.x_user_id == x_user_id))
+                    db_user = result.scalar_one()
+                    scrape_result = await retrieve_connections(db_user, scrape_session)
+                    await scrape_session.commit()
+                    print(f"Scraped {scrape_result['profiles_added']} profiles for {user.username}")
+            except Exception as scrape_error:
+                print(f"Background scrape failed for {user.username}: {scrape_error}")
 
         return {
             "success": True,
             "x_user_id": x_user_id,
             "username": user.username,
+            "is_new_user": new_user,
         }
     except HTTPException:
         raise
