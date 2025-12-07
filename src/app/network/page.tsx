@@ -28,6 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/components/AuthProvider";
 import { useRouter } from "next/navigation";
+import GraphVisualization from "@/components/GraphVisualization";
 
 // X Logo SVG Component
 function XLogo({ className = "w-6 h-6" }: { className?: string }) {
@@ -55,8 +56,6 @@ const navItems = [
   { icon: Sparkles, label: "Nexus Search", href: "/dashboard", active: false },
 ];
 
-import GraphVisualization from "@/components/GraphVisualization";
-
 export default function NetworkPage() {
   const { user, isLoading: authLoading, logout } = useAuth();
   const router = useRouter();
@@ -66,6 +65,7 @@ export default function NetworkPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"all" | "1st" | "2nd">("all");
   const [selectedProfile, setSelectedProfile] = useState<NetworkProfile | null>(null);
+  const [bridgeProfile, setBridgeProfile] = useState<NetworkProfile | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -100,6 +100,25 @@ export default function NetworkPage() {
     const profile = profiles.find(p => p.x_user_id === node.id);
     if (profile) {
       setSelectedProfile(profile);
+      
+      // Calculate bridge for 2nd degree connections
+      if (profile.degree === 2) {
+        // Find an edge connecting to this profile from a 1st degree profile
+        const edge = edges.find(e => 
+          (e.target === profile.x_user_id || e.source === profile.x_user_id) && 
+          profiles.find(p => p.x_user_id === (e.target === profile.x_user_id ? e.source : e.target))?.degree === 1
+        );
+        
+        if (edge) {
+          const bridgeId = edge.target === profile.x_user_id ? edge.source : edge.target;
+          const bridge = profiles.find(p => p.x_user_id === bridgeId);
+          setBridgeProfile(bridge || null);
+        } else {
+          setBridgeProfile(null);
+        }
+      } else {
+        setBridgeProfile(null);
+      }
     }
   };
 
@@ -293,6 +312,7 @@ export default function NetworkPage() {
                 edges={edges} 
                 currentUser={displayUser}
                 onNodeClick={handleNodeClick}
+                selectedNodeId={selectedProfile?.x_user_id}
               />
             )}
           </div>
@@ -324,6 +344,31 @@ export default function NetworkPage() {
                     {selectedProfile.degree === 1 ? "1st Degree Connection" : "2nd Degree Connection"}
                   </Badge>
                 </div>
+
+                {selectedProfile.degree === 2 && bridgeProfile && (
+                  <div className="bg-[#1d9bf0]/10 border border-[#1d9bf0]/20 rounded-xl p-4">
+                    <h4 className="text-[#1d9bf0] font-bold text-sm mb-2 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" />
+                      Introduction Path
+                    </h4>
+                    <p className="text-[14px] leading-relaxed">
+                      Ask <span className="font-bold text-white">@{bridgeProfile.username}</span> to introduce you to <span className="font-bold text-white">@{selectedProfile.username}</span>.
+                    </p>
+                    <div className="flex items-center gap-2 mt-3 justify-center text-xs text-[#71767b]">
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded-full bg-[#1d9bf0]"></div> You
+                      </div>
+                      <div className="w-4 h-[1px] bg-[#2f3336]"></div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded-full bg-[#00ba7c]"></div> @{bridgeProfile.username}
+                      </div>
+                      <div className="w-4 h-[1px] bg-[#2f3336]"></div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded-full bg-[#71767b]"></div> @{selectedProfile.username}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   <div>
@@ -359,4 +404,3 @@ export default function NetworkPage() {
     </div>
   );
 }
-

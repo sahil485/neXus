@@ -38,16 +38,19 @@ interface GraphVisualizationProps {
   edges: { source: string; target: string }[];
   currentUser: any;
   onNodeClick: (node: GraphNode) => void;
+  selectedNodeId?: string | null;
 }
 
-export default function GraphVisualization({ profiles, edges, currentUser, onNodeClick }: GraphVisualizationProps) {
+export default function GraphVisualization({ profiles, edges, currentUser, onNodeClick, selectedNodeId }: GraphVisualizationProps) {
   const fgRef = useRef<any>(null);
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
+  const [highlightNodes, setHighlightNodes] = useState(new Set<string>());
+  const [highlightLinks, setHighlightLinks] = useState(new Set<string>());
 
   useEffect(() => {
     if (!currentUser) return;
     
-    // ... rest of useEffect
+    // Create nodes
     const nodes: GraphNode[] = [
       {
         id: currentUser.x_user_id,
@@ -79,6 +82,85 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
     });
   }, [profiles, edges, currentUser]);
 
+  // Handle highlighting when selection changes
+  useEffect(() => {
+    if (!selectedNodeId || !currentUser) {
+      setHighlightNodes(new Set());
+      setHighlightLinks(new Set());
+      return;
+    }
+
+    const nodesToHighlight = new Set<string>();
+    const linksToHighlight = new Set<string>();
+
+    nodesToHighlight.add(selectedNodeId);
+    nodesToHighlight.add(currentUser.x_user_id);
+
+    // Helper to find edge between two nodes
+    const findEdge = (source: string, target: string) => {
+      // Edges in graphData.links might be objects (processed by library) or raw objects
+      // We check both directions
+      return graphData.links.find((l: any) => {
+        const sourceId = l.source.id || l.source;
+        const targetId = l.target.id || l.target;
+        return (sourceId === source && targetId === target) ||
+               (sourceId === target && targetId === source);
+      });
+    };
+
+    const selectedNode = graphData.nodes.find(n => n.id === selectedNodeId);
+    
+    if (selectedNode) {
+      if (selectedNode.degree === 1) {
+        // Direct connection
+        const link = findEdge(currentUser.x_user_id, selectedNodeId);
+        if (link) {
+          const sourceId = (link.source as any).id || link.source;
+          const targetId = (link.target as any).id || link.target;
+          linksToHighlight.add(sourceId === currentUser.x_user_id ? `${sourceId}-${targetId}` : `${targetId}-${sourceId}`);
+          linksToHighlight.add(sourceId !== currentUser.x_user_id ? `${sourceId}-${targetId}` : `${targetId}-${sourceId}`);
+          // Just add both directions to be safe or use consistent key
+          linksToHighlight.add(typeof link.source === 'object' ? `${(link.source as any).id}-${(link.target as any).id}` : `${link.source}-${link.target}`);
+        }
+      } else if (selectedNode.degree === 2) {
+        // Find the bridge node (1st degree connection)
+        // Look for an edge where target is selectedNodeId (or source is selectedNodeId)
+        // The other end must be a 1st degree connection
+        const bridgeLink = graphData.links.find((l: any) => {
+          const sourceId = l.source.id || l.source;
+          const targetId = l.target.id || l.target;
+          
+          if (sourceId === selectedNodeId) {
+            const targetNode = graphData.nodes.find(n => n.id === targetId);
+            return targetNode?.degree === 1;
+          } else if (targetId === selectedNodeId) {
+            const sourceNode = graphData.nodes.find(n => n.id === sourceId);
+            return sourceNode?.degree === 1;
+          }
+          return false;
+        });
+
+        if (bridgeLink) {
+          const sourceId = (bridgeLink.source as any).id || bridgeLink.source;
+          const targetId = (bridgeLink.target as any).id || bridgeLink.target;
+          const bridgeId = sourceId === selectedNodeId ? targetId : sourceId;
+          
+          nodesToHighlight.add(bridgeId);
+          linksToHighlight.add(typeof bridgeLink.source === 'object' ? `${(bridgeLink.source as any).id}-${(bridgeLink.target as any).id}` : `${bridgeLink.source}-${bridgeLink.target}`);
+
+          // Add link from bridge to root
+          const rootLink = findEdge(currentUser.x_user_id, bridgeId);
+          if (rootLink) {
+             linksToHighlight.add(typeof rootLink.source === 'object' ? `${(rootLink.source as any).id}-${(rootLink.target as any).id}` : `${rootLink.source}-${rootLink.target}`);
+          }
+        }
+      }
+    }
+
+    setHighlightNodes(nodesToHighlight);
+    setHighlightLinks(linksToHighlight);
+  }, [selectedNodeId, graphData, currentUser]);
+
   return (
     <div className="w-full h-full bg-black rounded-lg overflow-hidden border border-[#2f3336]">
       <div className="absolute top-4 right-4 z-10 bg-black/80 p-2 rounded-lg border border-[#2f3336]">
@@ -102,16 +184,43 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
           graphData={graphData}
           nodeLabel="name"
           backgroundColor="#000000"
-          linkColor={() => "#2f3336"}
+          linkColor={(link: any) => {
+            const id = link.source.id ? `${link.source.id}-${link.target.id}` : `${link.source}-${link.target}`;
+            const isHighlighted = highlightLinks.has(id);
+            if (highlightNodes.size > 0) {
+              return isHighlighted ? "#1d9bf0" : "#2f333620"; // Dim others
+            }
+            return "#2f3336";
+          }}
+          linkWidth={(link: any) => {
+            const id = link.source.id ? `${link.source.id}-${link.target.id}` : `${link.source}-${link.target}`;
+            return highlightLinks.has(id) ? 3 : 1;
+          }}
           nodeRelSize={6}
           nodeCanvasObject={(node: any, ctx, globalScale) => {
             const size = node.val;
             
+            // Check highlighting
+            const isHighlighted = highlightNodes.has(node.id);
+            const isDimmed = highlightNodes.size > 0 && !isHighlighted;
+            
+            // Apply opacity
+            ctx.globalAlpha = isDimmed ? 0.2 : 1;
+
             // Draw circle border
             ctx.beginPath();
             ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
             ctx.fillStyle = node.degree === 0 ? "#1d9bf0" : node.degree === 1 ? "#00ba7c" : "#71767b";
+            if (isHighlighted && node.degree !== 0) {
+               ctx.shadowColor = "#1d9bf0";
+               ctx.shadowBlur = 15;
+            } else {
+               ctx.shadowBlur = 0;
+            }
             ctx.fill();
+            
+            // Reset shadow for image
+            ctx.shadowBlur = 0;
 
             // Draw image
             const img = new Image();
@@ -128,6 +237,8 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
                 // Fallback or ignore if image not loaded yet
             }
             ctx.restore();
+            
+            ctx.globalAlpha = 1; // Reset alpha
           }}
           onNodeClick={(node: any) => {
             // Center view on node
