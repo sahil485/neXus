@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { inngest } from "@/lib/inngest/client";
 import { getSession } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
     // Get the current user's session
     const session = await getSession();
-    
+
     if (!session || !session.user) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -16,24 +15,39 @@ export async function POST(request: NextRequest) {
 
     const { user } = session;
 
-    // Trigger the background scraping job
-    await inngest.send({
-      name: "scrape/network.requested",
-      data: {
-        userId: user.x_user_id,
-        username: user.username,
-        accessToken: session.accessToken,
-        // Note: Twitter API v2 OAuth 2.0 doesn't use accessSecret
-        // You might need to adjust based on your OAuth implementation
-        accessSecret: "", // Leave empty for OAuth 2.0
-      },
-    });
+    // Call backend to trigger scraping (which happens automatically on login anyway)
+    // This is a manual trigger for the "Start Indexing" button
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
-    return NextResponse.json({
-      success: true,
-      message: "Scraping job started in background",
-      username: user.username,
-    });
+    try {
+      const response = await fetch(`${backendUrl}/api/scrape/posts/${user.username}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Backend returned ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      return NextResponse.json({
+        success: true,
+        message: "Post scraping started in background",
+        username: user.username,
+        ...data,
+      });
+    } catch (backendError) {
+      console.error("Backend scraping error:", backendError);
+      return NextResponse.json(
+        {
+          error: "Failed to trigger scraping",
+          details: backendError instanceof Error ? backendError.message : String(backendError)
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("Failed to trigger scraping:", error);
     return NextResponse.json(

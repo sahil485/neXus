@@ -1,8 +1,11 @@
 import httpx
+import logging
 from typing import Optional, List, Dict, Union
 from datetime import datetime
 from nexus.models.x_profile import XProfileCreate
 from nexus.models.x_tweet import XTweetCreate
+
+logger = logging.getLogger(__name__)
 
 
 class TwitterClient:
@@ -33,22 +36,34 @@ class TwitterClient:
         params: Optional[Dict[str, Union[str, int]]] = None
     ) -> Dict[str, Union[str, int, List, Dict]]:
         url = f"{self.BASE_URL}{endpoint}"
-        
+
         async with httpx.AsyncClient() as client:
-            response = await client.request(
-                method=method,
-                url=url,
-                headers=self.headers,
-                params=params,
-                timeout=30.0
-            )
-            
-            if response.status_code == 429:
-                reset_time = response.headers.get("x-rate-limit-reset")
-                raise Exception(f"Rate limited. Resets at: {reset_time}")
-            
-            response.raise_for_status()
-            return response.json()
+            try:
+                response = await client.request(
+                    method=method,
+                    url=url,
+                    headers=self.headers,
+                    params=params,
+                    timeout=30.0
+                )
+
+                if response.status_code == 429:
+                    reset_time = response.headers.get("x-rate-limit-reset")
+                    logger.warning(f"⏱️  RATE LIMITED on {endpoint}. Resets at: {reset_time}")
+                    raise Exception(f"Rate limited. Resets at: {reset_time}")
+
+                response.raise_for_status()
+                logger.info(f"✅ Success: {method} {endpoint} (status: {response.status_code})")
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                logger.error(f"❌ HTTP Error {e.response.status_code} on {endpoint}: {e.response.text}")
+                raise
+            except httpx.TimeoutException:
+                logger.error(f"⏰ Timeout on {endpoint}")
+                raise
+            except Exception as e:
+                logger.error(f"❌ Request failed on {endpoint}: {str(e)}")
+                raise
 
     async def get_me(self) -> XProfileCreate:
         params = {"user.fields": ",".join(self.USER_FIELDS)}
@@ -83,7 +98,7 @@ class TwitterClient:
     async def get_following(
         self,
         user_id: str,
-        max_results: int = 1000,
+        max_results: int = 10,
         pagination_token: Optional[str] = None
     ) -> Dict[str, Union[List[XProfileCreate], Optional[str]]]:
         params = {
@@ -106,7 +121,7 @@ class TwitterClient:
     async def get_followers(
         self,
         user_id: str,
-        max_results: int = 1000,
+        max_results: int = 10,
         pagination_token: Optional[str] = None
     ) -> Dict[str, Union[List[XProfileCreate], Optional[str]]]:
         params = {
@@ -191,23 +206,16 @@ class TwitterClient:
         user_id: str,
         count: int = 50
     ) -> List[XTweetCreate]:
-        all_tweets = []
-        next_token = None
-        
-        while len(all_tweets) < count:
-            remaining = count - len(all_tweets)
+        try:
+            next_token = None
             result = await self.get_user_tweets(
-                user_id, 
-                max_results=min(remaining, 100),
+                user_id,
+                max_results=count,
                 pagination_token=next_token
             )
-            all_tweets.extend(result["tweets"])
-            next_token = result["next_token"]
-            
-            if not next_token:
-                break
-        
-        return all_tweets[:count]
+            return result["tweets"]
+        except Exception:
+            return []
 
     async def get_user_posts_text(self, user_id: str, count: int = 50) -> List[str]:
         """Get just the text content of a user's posts as a list of strings"""

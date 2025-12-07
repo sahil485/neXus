@@ -11,6 +11,7 @@ from datetime import datetime
 from nexus.utils import get_db
 from nexus.db.schema import UserDb, XProfile, XConnection, XPosts
 from nexus.services.twitter_client import TwitterClient
+from nexus.services.scraper import scrape_posts_for_user_network, scrape_connections
 
 router = APIRouter(tags=["scrape"])
 
@@ -146,6 +147,54 @@ async def scrape_user_posts(
             "username": profile.username
         }
 
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Posts scraping failed: {str(e)}")
+
+
+@router.post("/scrape/connections/{username}")
+async def scrape_user_connections(username: str, db: AsyncSession = Depends(get_db)):
+    """Scrape all connections (1st and 2nd degree) for a user"""
+    result = await db.execute(
+        select(UserDb).where(UserDb.username == username)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        scrape_result = await scrape_connections(user, db)
+
+        return {
+            "success": True,
+            "message": "Connections scraped successfully",
+            **scrape_result
+        }
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Connection scraping failed: {str(e)}")
+
+
+@router.post("/scrape/posts/{username}")
+async def scrape_network_posts(username: str, db: AsyncSession = Depends(get_db)):
+    """Scrape posts for a user's entire network (1st and 2nd degree)"""
+    result = await db.execute(
+        select(UserDb).where(UserDb.username == username)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        posts_result = await scrape_posts_for_user_network(user, db)
+
+        return {
+            "success": True,
+            "message": "Network posts scraped successfully",
+            **posts_result
+        }
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Posts scraping failed: {str(e)}")
