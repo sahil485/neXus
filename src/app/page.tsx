@@ -185,25 +185,6 @@ function LandingPageContent() {
               }}
             />
           </div>
-
-          {/* Trust badges */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.4 }}
-            className="flex items-center justify-center gap-8 mt-6 text-xs text-slate-600 uppercase tracking-widest"
-          >
-            {[
-              { color: "bg-emerald-500", label: "Secure" },
-              { color: "bg-blue-500", label: "AI-Powered" },
-              { color: "bg-purple-500", label: "Real-time" },
-            ].map(({ color, label }) => (
-              <span key={label} className="flex items-center gap-2">
-                <div className={`w-1.5 h-1.5 rounded-full ${color}`} />
-                {label}
-              </span>
-            ))}
-          </motion.div>
         </motion.div>
       </main>
 
