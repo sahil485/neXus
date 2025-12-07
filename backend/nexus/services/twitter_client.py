@@ -1,27 +1,19 @@
-"""
-Twitter/X API v2 Client for fetching user data, follows, and tweets.
-"""
-
 import httpx
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Union
 from datetime import datetime
 from nexus.models.x_profile import XProfileCreate
 from nexus.models.x_tweet import XTweetCreate
 
 
 class TwitterClient:
-    """Async client for Twitter API v2"""
-    
     BASE_URL = "https://api.twitter.com/2"
-    
-    # Fields to request for user profiles
+
     USER_FIELDS = [
         "id", "name", "username", "description", "location",
         "profile_image_url", "public_metrics", "verified", "verified_type",
         "created_at", "protected"
     ]
-    
-    # Fields to request for tweets
+
     TWEET_FIELDS = [
         "id", "text", "created_at", "public_metrics", "conversation_id",
         "in_reply_to_user_id", "referenced_tweets", "entities", "lang"
@@ -35,12 +27,11 @@ class TwitterClient:
         }
     
     async def _request(
-        self, 
-        method: str, 
-        endpoint: str, 
-        params: Optional[Dict] = None
-    ) -> Dict[str, Any]:
-        """Make an authenticated request to Twitter API"""
+        self,
+        method: str,
+        endpoint: str,
+        params: Optional[Dict[str, Union[str, int]]] = None
+    ) -> Dict[str, Union[str, int, List, Dict]]:
         url = f"{self.BASE_URL}{endpoint}"
         
         async with httpx.AsyncClient() as client:
@@ -58,29 +49,23 @@ class TwitterClient:
             
             response.raise_for_status()
             return response.json()
-    
-    # ============ User/Profile Endpoints ============
-    
+
     async def get_me(self) -> XProfileCreate:
-        """Get the authenticated user's profile"""
         params = {"user.fields": ",".join(self.USER_FIELDS)}
         data = await self._request("GET", "/users/me", params)
         return self._parse_user(data["data"])
     
     async def get_user_by_id(self, user_id: str) -> XProfileCreate:
-        """Get a user by their Twitter ID"""
         params = {"user.fields": ",".join(self.USER_FIELDS)}
         data = await self._request("GET", f"/users/{user_id}", params)
         return self._parse_user(data["data"])
     
     async def get_user_by_username(self, username: str) -> XProfileCreate:
-        """Get a user by their username"""
         params = {"user.fields": ",".join(self.USER_FIELDS)}
         data = await self._request("GET", f"/users/by/username/{username}", params)
         return self._parse_user(data["data"])
     
     async def get_users_batch(self, user_ids: List[str]) -> List[XProfileCreate]:
-        """Get multiple users by IDs (max 100 per request)"""
         if len(user_ids) > 100:
             raise ValueError("Maximum 100 user IDs per request")
         
@@ -94,20 +79,13 @@ class TwitterClient:
         for user_data in data.get("data", []):
             users.append(self._parse_user(user_data))
         return users
-    
-    # ============ Follows Endpoints ============
-    
+
     async def get_following(
-        self, 
-        user_id: str, 
+        self,
+        user_id: str,
         max_results: int = 1000,
         pagination_token: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Get users that a user is following.
-        Returns: {"users": [...], "next_token": "..." or None}
-        Rate limit: 15 requests per 15 minutes
-        """
+    ) -> Dict[str, Union[List[XProfileCreate], Optional[str]]]:
         params = {
             "user.fields": ",".join(self.USER_FIELDS),
             "max_results": min(max_results, 1000),
@@ -126,16 +104,11 @@ class TwitterClient:
         return {"users": users, "next_token": next_token}
     
     async def get_followers(
-        self, 
-        user_id: str, 
+        self,
+        user_id: str,
         max_results: int = 1000,
         pagination_token: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Get users who follow a user.
-        Returns: {"users": [...], "next_token": "..." or None}
-        Rate limit: 15 requests per 15 minutes
-        """
+    ) -> Dict[str, Union[List[XProfileCreate], Optional[str]]]:
         params = {
             "user.fields": ",".join(self.USER_FIELDS),
             "max_results": min(max_results, 1000),
@@ -153,48 +126,48 @@ class TwitterClient:
         
         return {"users": users, "next_token": next_token}
     
-    async def get_all_following(self, user_id: str) -> List[XProfileCreate]:
-        """Fetch ALL users that a user follows (handles pagination)"""
+    async def get_all_following(self, user_id: str, max_results: Optional[int] = None) -> List[XProfileCreate]:
+        if max_results:
+            result = await self.get_following(user_id, max_results=max_results)
+            return result["users"]
+
         all_users = []
         next_token = None
-        
+
         while True:
             result = await self.get_following(user_id, pagination_token=next_token)
             all_users.extend(result["users"])
             next_token = result["next_token"]
-            
+
             if not next_token:
                 break
-        
+
         return all_users
     
-    async def get_all_followers(self, user_id: str) -> List[XProfileCreate]:
-        """Fetch ALL followers of a user (handles pagination)"""
+    async def get_all_followers(self, user_id: str, max_results: Optional[int] = None) -> List[XProfileCreate]:
+        if max_results:
+            result = await self.get_followers(user_id, max_results=max_results)
+            return result["users"]
+
         all_users = []
         next_token = None
-        
+
         while True:
             result = await self.get_followers(user_id, pagination_token=next_token)
             all_users.extend(result["users"])
             next_token = result["next_token"]
-            
+
             if not next_token:
                 break
-        
+
         return all_users
-    
-    # ============ Tweets Endpoints ============
-    
+
     async def get_user_tweets(
-        self, 
-        user_id: str, 
+        self,
+        user_id: str,
         max_results: int = 100,
         pagination_token: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Get a user's recent tweets.
-        Returns: {"tweets": [...], "next_token": "..." or None}
-        """
+    ) -> Dict[str, Union[List[XTweetCreate], Optional[str]]]:
         params = {
             "tweet.fields": ",".join(self.TWEET_FIELDS),
             "max_results": min(max_results, 100),
@@ -214,11 +187,10 @@ class TwitterClient:
         return {"tweets": tweets, "next_token": next_token}
     
     async def get_user_tweets_batch(
-        self, 
-        user_id: str, 
+        self,
+        user_id: str,
         count: int = 50
     ) -> List[XTweetCreate]:
-        """Fetch up to N tweets for a user"""
         all_tweets = []
         next_token = None
         
@@ -236,11 +208,8 @@ class TwitterClient:
                 break
         
         return all_tweets[:count]
-    
-    # ============ Parsing Helpers ============
-    
-    def _parse_user(self, data: Dict[str, Any]) -> XProfileCreate:
-        """Parse Twitter API user response into our model"""
+
+    def _parse_user(self, data: Dict[str, Union[str, int, bool, Dict[str, int]]]) -> XProfileCreate:
         metrics = data.get("public_metrics", {})
         
         created_at = None
@@ -266,8 +235,7 @@ class TwitterClient:
             account_created_at=created_at,
         )
     
-    def _parse_tweet(self, data: Dict[str, Any], author_id: str) -> XTweetCreate:
-        """Parse Twitter API tweet response into our model"""
+    def _parse_tweet(self, data: Dict[str, Union[str, int, Dict[str, int]]], author_id: str) -> XTweetCreate:
         metrics = data.get("public_metrics", {})
         
         created_at = None
