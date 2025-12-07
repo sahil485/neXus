@@ -36,6 +36,93 @@ async function generateEmbedding(text: string): Promise<number[]> {
   return data.embedding.values;
 }
 
+// Verify profiles with Grok - batch verification
+async function verifyProfilesWithGrok(
+  query: string,
+  profiles: any[]
+): Promise<{ verified: any[]; }> {
+  const apiKey = process.env.GROK_API_KEY;
+  
+  if (!apiKey || profiles.length === 0) {
+    return { verified: profiles };
+  }
+
+  // Build profile summaries for Grok
+  const profileSummaries = profiles.map((p, i) => 
+    `[${i + 1}] ${p.name} (@${p.username}): ${p.summary || p.bio || "No bio available"}`
+  ).join("\n\n");
+
+  const prompt = `You are verifying search results for the query: "${query}"
+
+Here are the candidate profiles:
+${profileSummaries}
+
+For EACH profile, respond with a JSON array. For each profile include:
+- "index": the profile number (1-based)
+- "include": true if this person is relevant to the query, false if not
+- "reason": ONE sentence (max 15 words) explaining why they match the query. Be specific about their relevance.
+
+Only include profiles that are genuinely relevant. Be strict but fair.
+
+Respond ONLY with valid JSON array, no other text:
+[{"index": 1, "include": true, "reason": "..."}, ...]`;
+
+  try {
+    const response = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "grok-4-1-fast",
+        messages: [
+          { role: "system", content: "You are a search result verification assistant. Respond only with valid JSON." },
+          { role: "user", content: prompt }
+        ],
+        max_tokens: 1000,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Grok verification failed:", await response.text());
+      return { verified: profiles };
+    }
+
+    const data = await response.json();
+    const content = data.choices[0].message.content.trim();
+    
+    // Parse JSON response
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.error("Could not parse Grok response:", content);
+      return { verified: profiles };
+    }
+
+    const verifications = JSON.parse(jsonMatch[0]);
+    
+    // Filter and enhance profiles based on Grok's response
+    const verified = profiles
+      .map((profile, i) => {
+        const verification = verifications.find((v: any) => v.index === i + 1);
+        if (verification && verification.include) {
+          return {
+            ...profile,
+            grokReason: verification.reason,
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
+
+    return { verified };
+  } catch (error) {
+    console.error("Grok verification error:", error);
+    return { verified: profiles };
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getSession();
@@ -102,17 +189,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Format and return results with degree info
-    // Convert similarity to a more meaningful match quality label
-    const getMatchQuality = (similarity: number) => {
-      if (similarity >= 0.7) return "Excellent match";
-      if (similarity >= 0.55) return "Strong match";
-      if (similarity >= 0.45) return "Good match";
-      if (similarity >= 0.35) return "Relevant";
-      return "Related";
-    };
+    // Take top 15 results for Grok verification
+    const topProfiles = (profiles || []).slice(0, 15);
     
-    const formattedProfiles = (profiles || []).map((p: any) => ({
+    // Verify with Grok
+    const { verified } = await verifyProfilesWithGrok(query, topProfiles);
+    
+    // Format verified results
+    const formattedProfiles = verified.map((p: any) => ({
       id: p.x_user_id,
       x_user_id: p.x_user_id,
       username: p.username,
@@ -123,13 +207,14 @@ export async function POST(request: NextRequest) {
       followers_count: p.followers_count,
       following_count: p.following_count,
       degree: p.degree,
-      matchReason: `${getMatchQuality(p.similarity)} • ${p.degree === 1 ? '1st' : '2nd'} degree`,
+      matchReason: p.grokReason || `${p.degree === 1 ? '1st' : '2nd'} degree connection`,
     }));
 
     return NextResponse.json({
       success: true,
       profiles: formattedProfiles,
       count: formattedProfiles.length,
+      verified: true,
     });
   } catch (error) {
     console.error("Search error:", error);
