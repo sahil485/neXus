@@ -52,19 +52,41 @@ export function IntroModal({
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Simulate AI generation when modal opens
+  // Generate intro with Grok when modal opens
+  const generateIntro = async () => {
+    if (!profile) return;
+    
+    setIsGenerating(true);
+    setError(null);
+    
+    try {
+      const response = await fetch("/api/generate-intro", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile, currentUser }),
+      });
+      
+      if (!response.ok) throw new Error("Failed to generate");
+      
+      const data = await response.json();
+      setMessage(data.message);
+    } catch (e) {
+      console.error("Error generating intro:", e);
+      setError("Failed to generate intro. Please try again.");
+      // Fallback to sample
+      setMessage(generateSampleIntro(profile, currentUser));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen && profile) {
-      setIsGenerating(true);
-      // Simulate API call
-      const timer = setTimeout(() => {
-        setMessage(generateSampleIntro(profile, currentUser));
-        setIsGenerating(false);
-      }, 1500);
-      return () => clearTimeout(timer);
+      generateIntro();
     }
-  }, [isOpen, profile, currentUser]);
+  }, [isOpen, profile]);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message);
@@ -73,11 +95,7 @@ export function IntroModal({
   };
 
   const handleRegenerate = () => {
-    setIsGenerating(true);
-    setTimeout(() => {
-      setMessage(generateSampleIntro(profile!, currentUser, true));
-      setIsGenerating(false);
-    }, 1500);
+    generateIntro();
     onRegenerate?.();
   };
 

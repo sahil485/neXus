@@ -53,7 +53,7 @@ BIO: ${bio}
 
 EVALUATE:
 Is there clear evidence in their bio that they fit the query and they are relevant to the search query?
-
+DO NOT MAKE UP USER INFO. ONLY RETURN TRUE IF THE USER IS RELEVANT TO THE SEARCH QUERY.
 
 RESPOND with JSON only:
 - If they ARE a good match: {"match":true,"why":"[specific 10-word reason citing their actual role/expertise]"}
@@ -206,41 +206,17 @@ export async function POST(request: NextRequest) {
       
       const readableStream = new ReadableStream({
         async start(controller) {
-          // Send all profiles immediately (unverified)
-          for (const profile of topProfiles) {
-            const formatted = {
-              id: profile.x_user_id,
-              x_user_id: profile.x_user_id,
-              username: profile.username,
-              name: profile.name,
-              bio: profile.bio,
-              summary: profile.summary,
-              profile_image_url: profile.profile_image_url,
-              followers_count: profile.followers_count,
-              following_count: profile.following_count,
-              degree: profile.degree,
-              matchLevel: getMatchLevel(profile.similarity),
-              aiReason: null,
-              verifying: true,
-            };
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'profile', profile: formatted })}\n\n`));
-          }
+          // Send skeleton count first so UI shows loading placeholders
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'skeleton', count: Math.min(topProfiles.length, 6) })}\n\n`));
           
-          // Now verify each profile and send updates
+          // Verify each profile and ONLY send ones that pass verification
           if (apiKey) {
-            const verifyPromises = topProfiles.map(async (profile) => {
+            const verifyPromises = topProfiles.map(async (profile: any) => {
               const result = await verifySingleProfile(query, profile, apiKey);
               
-              if (result === null || result.include) {
-                // Include - send update with reason
-                // Use Grok reason if available, otherwise generate from bio
-                let aiReason = result?.reason;
-                if (!aiReason || aiReason.length < 5) {
-                  const bio = profile.summary || profile.bio || "";
-                  const firstSentence = bio.split(/[.!?]/)[0].trim();
-                  aiReason = firstSentence.length > 10 ? firstSentence : `Matches "${query}" in your network`;
-                }
-                const updated = {
+              // Only send profiles that Grok verifies as good matches WITH a reason
+              if (result && result.include && result.reason && result.reason.length > 5) {
+                const verified = {
                   id: profile.x_user_id,
                   x_user_id: profile.x_user_id,
                   username: profile.username,
@@ -252,21 +228,39 @@ export async function POST(request: NextRequest) {
                   following_count: profile.following_count,
                   degree: profile.degree,
                   matchLevel: getMatchLevel(profile.similarity),
-                  aiReason: aiReason,
+                  aiReason: result.reason,
                   verifying: false,
                   verified: true,
                 };
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'update', profile: updated })}\n\n`));
-              } else {
-                // Exclude - send remove signal
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'remove', id: profile.x_user_id })}\n\n`));
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'profile', profile: verified })}\n\n`));
               }
+              // Don't send anything for non-matches - no remove animation
             });
             
             await Promise.all(verifyPromises);
+          } else {
+            // No API key - send all profiles without verification
+            for (const profile of topProfiles) {
+              const formatted = {
+                id: profile.x_user_id,
+                x_user_id: profile.x_user_id,
+                username: profile.username,
+                name: profile.name,
+                bio: profile.bio,
+                summary: profile.summary,
+                profile_image_url: profile.profile_image_url,
+                followers_count: profile.followers_count,
+                following_count: profile.following_count,
+                degree: profile.degree,
+                matchLevel: getMatchLevel(profile.similarity),
+                aiReason: null,
+                verifying: false,
+              };
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'profile', profile: formatted })}\n\n`));
+            }
           }
           
-          // Signal done
+          // Signal done - UI will hide remaining skeletons
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
           controller.close();
         }
@@ -284,7 +278,7 @@ export async function POST(request: NextRequest) {
     // Non-streaming: wait for all verifications
     const verificationPromise = verifyProfilesWithGrok(query, topProfiles);
     const timeoutPromise = new Promise<{ verified: any[] }>((resolve) => 
-      setTimeout(() => resolve({ verified: topProfiles.map(p => ({ ...p, grokReason: null })) }), 2000)
+      setTimeout(() => resolve({ verified: topProfiles.map((p: any) => ({ ...p, grokReason: null })) }), 2000)
     );
     
     const { verified } = await Promise.race([verificationPromise, timeoutPromise]);

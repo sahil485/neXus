@@ -40,6 +40,7 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [skeletonCount, setSkeletonCount] = useState(0);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [isIntroModalOpen, setIsIntroModalOpen] = useState(false);
   const [isIndexing, setIsIndexing] = useState(false);
@@ -62,6 +63,7 @@ export default function DashboardPage() {
     setSearchQuery(query);
     setHasSearched(true);
     setSearchResults([]);
+    setSkeletonCount(0);
     
     try {
       // Use streaming search for dynamic results
@@ -92,22 +94,18 @@ export default function DashboardPage() {
             try {
               const data = JSON.parse(line.slice(6));
               
-              if (data.type === "profile") {
-                // New profile - add to list
-                console.log("New profile:", data.profile.username, "aiReason:", data.profile.aiReason);
+              if (data.type === "skeleton") {
+                // Show skeleton placeholders
+                setSkeletonCount(data.count);
+                setIsSearching(false);
+              } else if (data.type === "profile") {
+                // Verified profile - add to list
                 setSearchResults(prev => [...prev, data.profile]);
-                setIsSearching(false); // Stop spinner once first result arrives
-              } else if (data.type === "update") {
-                // Update existing profile with verification result
-                console.log("Update profile:", data.profile.username, "aiReason:", data.profile.aiReason);
-                setSearchResults(prev => 
-                  prev.map(p => p.id === data.profile.id ? data.profile : p)
-                );
-              } else if (data.type === "remove") {
-                // Remove profile that didn't pass verification
-                setSearchResults(prev => prev.filter(p => p.id !== data.id));
+                // Reduce skeleton count as real profiles come in
+                setSkeletonCount(prev => Math.max(0, prev - 1));
               } else if (data.type === "done") {
-                // All done
+                // All done - hide remaining skeletons
+                setSkeletonCount(0);
                 setIsSearching(false);
               }
             } catch (e) {
@@ -119,6 +117,7 @@ export default function DashboardPage() {
     } catch (error) {
       console.error("Search error:", error);
       setIsSearching(false);
+      setSkeletonCount(0);
     }
   };
 
@@ -262,46 +261,76 @@ export default function DashboardPage() {
                 </div>
                 <p className="text-[#71767b] text-[14px] mt-4">Searching your network...</p>
               </div>
-            ) : searchResults.length > 0 ? (
-              <AnimatePresence mode="popLayout">
-                {searchResults.map((profile, i) => (
-                  <motion.div 
-                    key={profile.id} 
-                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, x: -100, scale: 0.9 }}
-                    transition={{ 
-                      duration: 0.3, 
-                      delay: i * 0.08,
-                      ease: [0.25, 0.46, 0.45, 0.94]
-                    }}
-                    layout
-                    className="border-b border-[#2f3336] hover:bg-white/[0.03] transition-colors cursor-pointer"
-                  >
-                    <div className="p-4">
-                      <ProfileCard 
-                        profile={profile} 
-                        onGenerateIntro={(p) => {
-                          setSelectedProfile(p);
-                          setIsIntroModalOpen(true);
-                        }} 
-                      />
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
             ) : (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex flex-col items-center justify-center py-20 px-8 text-center"
-              >
-                <Search className="w-12 h-12 text-[#71767b] mb-4" />
-                <h3 className="text-xl font-bold mb-2">No results found</h3>
-                <p className="text-[#71767b] text-[15px]">
-                  Try a different search query
-                </p>
-              </motion.div>
+              <>
+                {/* Verified Results */}
+                <AnimatePresence mode="popLayout">
+                  {searchResults.map((profile, i) => (
+                    <motion.div 
+                      key={profile.id} 
+                      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ 
+                        duration: 0.4, 
+                        ease: [0.25, 0.46, 0.45, 0.94]
+                      }}
+                      className="border-b border-[#2f3336] hover:bg-white/[0.03] transition-colors cursor-pointer"
+                    >
+                      <div className="p-4">
+                        <ProfileCard 
+                          profile={profile} 
+                          onGenerateIntro={(p) => {
+                            setSelectedProfile(p);
+                            setIsIntroModalOpen(true);
+                          }} 
+                        />
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+                
+                {/* Skeleton Loaders */}
+                {skeletonCount > 0 && (
+                  <>
+                    {Array.from({ length: skeletonCount }).map((_, i) => (
+                      <div key={`skeleton-${i}`} className="border-b border-[#2f3336] p-4">
+                        <div className="flex gap-3 animate-pulse">
+                          <div className="w-12 h-12 bg-[#2f3336] rounded-full" />
+                          <div className="flex-1 space-y-3">
+                            <div className="flex items-center gap-2">
+                              <div className="h-4 bg-[#2f3336] rounded w-32" />
+                              <div className="h-5 bg-[#2f3336] rounded w-10" />
+                            </div>
+                            <div className="h-3 bg-[#2f3336] rounded w-24" />
+                            <div className="h-4 bg-[#2f3336] rounded w-full" />
+                            <div className="h-4 bg-[#2f3336] rounded w-3/4" />
+                            <div className="flex gap-4">
+                              <div className="h-3 bg-[#2f3336] rounded w-20" />
+                              <div className="h-3 bg-[#2f3336] rounded w-20" />
+                            </div>
+                            <div className="h-10 bg-[#1d9bf0]/10 rounded-lg w-full" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+                
+                {/* No Results */}
+                {searchResults.length === 0 && skeletonCount === 0 && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-col items-center justify-center py-20 px-8 text-center"
+                  >
+                    <Search className="w-12 h-12 text-[#71767b] mb-4" />
+                    <h3 className="text-xl font-bold mb-2">No matching profiles</h3>
+                    <p className="text-[#71767b] text-[15px]">
+                      No one in your network matches this search
+                    </p>
+                  </motion.div>
+                )}
+              </>
             )}
           </div>
         )}
