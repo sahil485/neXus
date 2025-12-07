@@ -45,6 +45,7 @@ export default function DashboardPage() {
   const [isIntroModalOpen, setIsIntroModalOpen] = useState(false);
   const [isIndexing, setIsIndexing] = useState(false);
   const [indexProgress, setIndexProgress] = useState(0);
+  const [isCachedResult, setIsCachedResult] = useState(false);
 
   const [isDemo, setIsDemo] = useState(false);
   useEffect(() => {
@@ -64,6 +65,7 @@ export default function DashboardPage() {
     setHasSearched(true);
     setSearchResults([]);
     setSkeletonCount(0);
+    setIsCachedResult(false);
     
     try {
       // Use streaming search for dynamic results
@@ -74,6 +76,13 @@ export default function DashboardPage() {
       });
       
       if (!response.ok) throw new Error("Search failed");
+      
+      // Check if results are from cache
+      const cacheHit = response.headers.get('X-Cache-Hit') === 'true';
+      if (cacheHit) {
+        console.log('✅ Dashboard search results loaded from cache (instant!)');
+        setIsCachedResult(true);
+      }
       
       const reader = response.body?.getReader();
       if (!reader) throw new Error("No reader");
@@ -107,6 +116,10 @@ export default function DashboardPage() {
                 // All done - hide remaining skeletons
                 setSkeletonCount(0);
                 setIsSearching(false);
+                // Check if marked as cached in done message
+                if (data.cached) {
+                  setIsCachedResult(true);
+                }
               }
             } catch (e) {
               console.error("Parse error:", e);
@@ -253,6 +266,21 @@ export default function DashboardPage() {
 
         {hasSearched && (
           <div className="pb-20">
+            {/* Cache indicator */}
+            {isCachedResult && searchResults.length > 0 && (
+              <div className="mx-4 mt-4 mb-2 flex items-center justify-between gap-2 bg-green-500/10 border border-green-500/30 rounded-lg px-3 py-2">
+                <span className="text-[#e7e9ea] text-sm">
+                  Found {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+                </span>
+                <span className="bg-green-500/20 text-green-400 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  CACHED
+                </span>
+              </div>
+            )}
+            
             {isSearching ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <div className="relative">

@@ -2,6 +2,46 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 
+// ========== SEARCH CACHE ==========
+// Cache for dashboard search results
+// Key: (user_id, normalized_query) -> Value: (profiles, timestamp)
+const DASHBOARD_SEARCH_CACHE: Map<string, { profiles: any[]; timestamp: number }> = new Map();
+const CACHE_TTL_MS = 3600 * 1000; // 1 hour in milliseconds
+
+function getCacheKey(userId: string, query: string): string {
+  const normalized = query.toLowerCase().trim().replace(/\s+/g, " ");
+  return `${userId}:${normalized}`;
+}
+
+function getCachedSearch(userId: string, query: string): any[] | null {
+  const key = getCacheKey(userId, query);
+  const cached = DASHBOARD_SEARCH_CACHE.get(key);
+  
+  if (cached) {
+    const age = Date.now() - cached.timestamp;
+    if (age < CACHE_TTL_MS) {
+      console.log(`✅ Dashboard search cache HIT for "${query}" (age: ${Math.floor(age / 1000)}s)`);
+      return cached.profiles;
+    } else {
+      console.log(`⏰ Dashboard search cache EXPIRED for "${query}"`);
+      DASHBOARD_SEARCH_CACHE.delete(key);
+    }
+  }
+  
+  console.log(`❌ Dashboard search cache MISS for "${query}"`);
+  return null;
+}
+
+function cacheSearchResults(userId: string, query: string, profiles: any[]) {
+  const key = getCacheKey(userId, query);
+  DASHBOARD_SEARCH_CACHE.set(key, {
+    profiles,
+    timestamp: Date.now()
+  });
+  console.log(`💾 Cached ${profiles.length} profiles for dashboard search "${query}"`);
+}
+// ===================================
+
 // Generate embedding using Google Gemini
 async function generateEmbedding(text: string): Promise<number[]> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -163,6 +203,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check cache first
+    const cachedProfiles = getCachedSearch(session.user.x_user_id, query);
+    if (cachedProfiles !== null) {
+      // Return cached results
+      if (stream) {
+        // For streaming requests, send cached results quickly
+        const encoder = new TextEncoder();
+        const readableStream = new ReadableStream({
+          async start(controller) {
+            // Send skeleton first
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'skeleton', count: cachedProfiles.length })}\n\n`));
+            
+            // Send all cached profiles
+            for (const profile of cachedProfiles) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'profile', profile })}\n\n`));
+            }
+            
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done', cached: true })}\n\n`));
+            controller.close();
+          }
+        });
+        
+        return new Response(readableStream, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'X-Cache-Hit': 'true',
+          },
+        });
+      } else {
+        // Non-streaming cached response
+        return NextResponse.json({
+          success: true,
+          profiles: cachedProfiles,
+          count: cachedProfiles.length,
+          cached: true
+        }, {
+          headers: {
+            'X-Cache-Hit': 'true'
+          }
+        });
+      }
+    }
+
     // Generate embedding for the search query
     const queryEmbedding = await generateEmbedding(query);
 
@@ -209,6 +294,9 @@ export async function POST(request: NextRequest) {
           // Send skeleton count first so UI shows loading placeholders
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'skeleton', count: Math.min(topProfiles.length, 6) })}\n\n`));
           
+          // Track all sent profiles for caching
+          const sentProfiles: any[] = [];
+          
           // Verify each profile and ONLY send ones that pass verification
           if (apiKey) {
             const verifyPromises = topProfiles.map(async (profile: any) => {
@@ -232,6 +320,7 @@ export async function POST(request: NextRequest) {
                   verifying: false,
                   verified: true,
                 };
+                sentProfiles.push(verified);
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'profile', profile: verified })}\n\n`));
               }
               // Don't send anything for non-matches - no remove animation
@@ -256,8 +345,14 @@ export async function POST(request: NextRequest) {
                 aiReason: null,
                 verifying: false,
               };
+              sentProfiles.push(formatted);
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'profile', profile: formatted })}\n\n`));
             }
+          }
+          
+          // Cache the results for next time
+          if (sentProfiles.length > 0) {
+            cacheSearchResults(session.user.x_user_id, query, sentProfiles);
           }
           
           // Signal done - UI will hide remaining skeletons
@@ -271,6 +366,7 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
           'Connection': 'keep-alive',
+          'X-Cache-Hit': 'false',
         },
       });
     }
@@ -299,10 +395,17 @@ export async function POST(request: NextRequest) {
       verifying: false,
     }));
 
+    // Cache the results for next time
+    cacheSearchResults(session.user.x_user_id, query, formattedProfiles);
+
     return NextResponse.json({
       success: true,
       profiles: formattedProfiles,
       count: formattedProfiles.length,
+    }, {
+      headers: {
+        'X-Cache-Hit': 'false'
+      }
     });
   } catch (error) {
     console.error("Search error:", error);
