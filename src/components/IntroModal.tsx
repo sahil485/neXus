@@ -1,0 +1,309 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Copy,
+  Check,
+  ExternalLink,
+  RefreshCw,
+  Sparkles,
+  Users,
+  X,
+} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import type { Profile } from "./ProfileCard";
+
+// X Logo SVG Component
+function XLogo({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
+interface IntroModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  profile: Profile | null;
+  currentUser?: {
+    name: string;
+    username: string;
+    profile_image_url?: string;
+  };
+  onRegenerate?: () => void;
+  isLoading?: boolean;
+}
+
+const MAX_CHARS = 280;
+
+export function IntroModal({
+  isOpen,
+  onClose,
+  profile,
+  currentUser,
+  onRegenerate,
+  isLoading = false,
+}: IntroModalProps) {
+  const [message, setMessage] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Simulate AI generation when modal opens
+  useEffect(() => {
+    if (isOpen && profile) {
+      setIsGenerating(true);
+      // Simulate API call
+      const timer = setTimeout(() => {
+        setMessage(generateSampleIntro(profile, currentUser));
+        setIsGenerating(false);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, profile, currentUser]);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(message);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRegenerate = () => {
+    setIsGenerating(true);
+    setTimeout(() => {
+      setMessage(generateSampleIntro(profile!, currentUser, true));
+      setIsGenerating(false);
+    }, 1500);
+    onRegenerate?.();
+  };
+
+  const handleOpenDM = () => {
+    if (profile) {
+      window.open(
+        `https://twitter.com/messages/compose?recipient_id=${profile.x_user_id}&text=${encodeURIComponent(message)}`,
+        "_blank"
+      );
+    }
+  };
+
+  const charCount = message.length;
+  const isOverLimit = charCount > MAX_CHARS;
+  const charPercentage = Math.min((charCount / MAX_CHARS) * 100, 100);
+
+  if (!profile) return null;
+
+  const degreeConfig = {
+    1: { label: "1st", bgColor: "bg-[#1d9bf0]" },
+    2: { label: "2nd", bgColor: "bg-[#00ba7c]" },
+    3: { label: "3rd", bgColor: "bg-[#f91880]" },
+  };
+
+  const degree = degreeConfig[profile.degree];
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-lg bg-black border-white/20 p-0 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+          <button
+            onClick={onClose}
+            className="p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <span className="font-bold">New Message</span>
+          <div className="w-9" /> {/* Spacer */}
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* Profile preview */}
+          <div className="flex items-center gap-3">
+            <Avatar className="w-12 h-12">
+              <AvatarImage src={profile.profile_image_url} alt={profile.name} />
+              <AvatarFallback className="bg-gray-800 text-white font-bold">
+                {profile.name.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-bold truncate">{profile.name}</span>
+                <Badge 
+                  variant="secondary" 
+                  className={`${degree.bgColor} text-white text-xs font-bold px-2 py-0`}
+                >
+                  {degree.label}
+                </Badge>
+              </div>
+              <span className="text-sm text-gray-500">@{profile.username}</span>
+            </div>
+          </div>
+
+          {/* Mutual connections hint */}
+          <div className="flex items-center gap-2 text-sm text-gray-500 px-1">
+            <Users className="w-4 h-4 text-[#1d9bf0]" />
+            <span>
+              <span className="text-[#1d9bf0] font-medium">3 mutual connections</span>
+            </span>
+          </div>
+
+          {/* Message editor */}
+          <div className="relative">
+            <AnimatePresence mode="wait">
+              {isGenerating ? (
+                <motion.div
+                  key="loading"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="h-40 flex items-center justify-center"
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="relative">
+                      <div className="w-10 h-10 rounded-full border-2 border-white/20 border-t-[#1d9bf0] animate-spin" />
+                      <Sparkles className="w-4 h-4 text-[#1d9bf0] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                    </div>
+                    <p className="text-sm text-gray-500">AI is crafting your message...</p>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="editor"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                >
+                  <Textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Write your message..."
+                    className={`min-h-40 resize-none bg-transparent border-0 focus-visible:ring-0 text-[17px] leading-relaxed placeholder:text-gray-600 ${
+                      isOverLimit ? "text-red-500" : ""
+                    }`}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Character count & AI badge */}
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <Sparkles className="w-3 h-3 text-[#1d9bf0]" />
+              <span>Powered by Claude AI</span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {/* Circular progress */}
+              <div className="relative w-6 h-6">
+                <svg className="w-6 h-6 -rotate-90">
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="text-white/10"
+                  />
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeDasharray={`${charPercentage * 0.628} 100`}
+                    className={isOverLimit ? "text-red-500" : charCount > 260 ? "text-yellow-500" : "text-[#1d9bf0]"}
+                  />
+                </svg>
+              </div>
+              <span
+                className={`text-xs font-mono ${
+                  isOverLimit ? "text-red-500" : "text-gray-500"
+                }`}
+              >
+                {MAX_CHARS - charCount}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="px-4 py-3 border-t border-white/10 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-[#1d9bf0] hover:bg-[#1d9bf0]/10 rounded-full"
+              onClick={handleRegenerate}
+              disabled={isGenerating}
+            >
+              <RefreshCw className={`w-4 h-4 mr-1.5 ${isGenerating ? "animate-spin" : ""}`} />
+              Regenerate
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`rounded-full transition-all duration-300 ${
+                copied
+                  ? "text-green-500 hover:bg-green-500/10"
+                  : "text-gray-400 hover:bg-white/10"
+              }`}
+              onClick={handleCopy}
+              disabled={isGenerating || !message}
+            >
+              {copied ? (
+                <>
+                  <Check className="w-4 h-4 mr-1.5" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 mr-1.5" />
+                  Copy
+                </>
+              )}
+            </Button>
+          </div>
+
+          <Button
+            className="bg-white text-black font-bold rounded-full hover:bg-white/90 transition-colors px-5"
+            onClick={handleOpenDM}
+            disabled={isGenerating || !message || isOverLimit}
+          >
+            <XLogo className="w-4 h-4 mr-1.5" />
+            Send on X
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Sample intro generator (for demo purposes)
+function generateSampleIntro(
+  profile: Profile,
+  currentUser?: { name: string; username: string },
+  variant = false
+): string {
+  const intros = [
+    `Hey ${profile.name.split(" ")[0]}! 👋 I came across your profile through our mutual network and love your work on ${profile.topics?.[0] || "tech"}. Would love to connect and learn more about your journey!`,
+    `Hi ${profile.name.split(" ")[0]}! I noticed we share some connections and interests in ${profile.topics?.[0] || "the industry"}. Your thoughts on ${profile.topics?.[1] || "innovation"} really resonate. Would be great to connect!`,
+    `${profile.name.split(" ")[0]}, your insights on ${profile.topics?.[0] || "technology"} are 🔥! We're connected through a few mutual friends. Mind if we connect?`,
+  ];
+
+  return variant
+    ? intros[Math.floor(Math.random() * intros.length)]
+    : intros[0];
+}
