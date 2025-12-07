@@ -5,7 +5,8 @@ Twitter/X API v2 Client for fetching user data, follows, and tweets.
 import httpx
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from nexus.models.user import XProfileCreate, XTweetCreate
+from nexus.models.x_profile import XProfileCreate
+from nexus.models.x_tweet import XTweetCreate
 
 
 class TwitterClient:

@@ -1,7 +1,7 @@
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, Text, Boolean, BigInteger, ForeignKey, UniqueConstraint
+from sqlalchemy import String, Text, Boolean, BigInteger, ForeignKey, UniqueConstraint, ARRAY
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 
 class Base(DeclarativeBase):
@@ -50,18 +50,13 @@ class XProfile(Base):
 
 # ============ X Follows (The Graph - who follows whom) ============
 
-class XFollow(Base):
-    """Twitter's follow graph - who follows whom (global, shared)"""
-    __tablename__ = "x_follows"
+class XConnection(Base):
+    """Twitter's follow graph - stores mutual connections as array"""
+    __tablename__ = "x_connections"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    follower_id: Mapped[str] = mapped_column(String(50), ForeignKey("x_profiles.x_user_id"), index=True)
-    following_id: Mapped[str] = mapped_column(String(50), ForeignKey("x_profiles.x_user_id"), index=True)
+    x_user_id: Mapped[str] = mapped_column(String(50), ForeignKey("x_profiles.x_user_id"), primary_key=True)
+    mutual_ids: Mapped[List[str]] = mapped_column(ARRAY(String(50)), default=list)
     discovered_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-
-    __table_args__ = (
-        UniqueConstraint('follower_id', 'following_id', name='uq_follow_edge'),
-    )
 
 
 # ============ X Tweets (For content analysis) ============

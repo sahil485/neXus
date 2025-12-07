@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from dotenv import load_dotenv
 import os
-from nexus.db.schema import Base, UserDb, XProfile, XFollow, XTweet
+from nexus.db.schema import Base, UserDb, XProfile, XConnection, XTweet
 
 load_dotenv()
 
@@ -30,4 +30,4 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
 
 
-__all__ = ["Base", "UserDb", "XProfile", "XFollow", "XTweet", "engine", "async_session_maker", "init_db"]
+__all__ = ["Base", "UserDb", "XProfile", "XConnection", "XTweet", "engine", "async_session_maker", "init_db"]
