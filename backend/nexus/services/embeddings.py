@@ -29,21 +29,42 @@ class EmbeddingsService:
         self.embedding_model = "models/text-embedding-004"
         self.grok_model = "grok-4-1-fast"
     
-    async def generate_profile_summary(self, profile: XProfile) -> str:
-        """Generate a detailed profile summary using Grok"""
+    async def generate_profile_summary(self, profile: XProfile, posts: list = None) -> str:
+        """Generate a detailed, keyword-rich profile summary using Grok.
+        Combines profile info with their posts for comprehensive searchability."""
         profile_text = self.create_profile_text(profile)
         
-        prompt = f"""Generate a concise, searchable profile summary for this Twitter user. Focus on their professional background, interests, and key characteristics that would be useful for networking.
+        # Include posts in the context if available
+        posts_text = ""
+        if posts and len(posts) > 0:
+            # Take up to 10 most recent posts
+            sample_posts = posts[:10] if len(posts) > 10 else posts
+            posts_text = f"\n\nRecent Posts/Tweets:\n" + "\n---\n".join(sample_posts)
+        
+        prompt = f"""Analyze this Twitter/X user's profile and posts to create a HIGHLY SEARCHABLE summary.
+
+Your goal: Create a summary packed with KEYWORDS and PHRASES that someone might search to find this person.
 
 Profile Data:
 {profile_text}
+{posts_text}
 
-Generate a 2-3 sentence summary that captures:
-1. Their professional role/expertise
-2. Main interests or focus areas
-3. Notable characteristics or achievements
+INSTRUCTIONS:
+1. Extract and include: job titles, company names, industries, technologies, skills, interests, topics they discuss
+2. Include relevant keywords like: "AI researcher", "startup founder", "machine learning engineer", "web3 developer", "venture capitalist", "climate tech", etc.
+3. Mention specific technologies, frameworks, or tools they work with
+4. Include their location and any affiliations (universities, companies, organizations)
+5. Note their expertise areas and what they're known for
 
-Summary:"""
+FORMAT:
+- Write 3-4 sentences that are DENSE with searchable keywords
+- Then add a "Keywords:" section at the end with 10-15 comma-separated searchable terms
+
+EXAMPLE OUTPUT:
+Jane Doe is a machine learning engineer at OpenAI specializing in large language models and AI safety research. Based in San Francisco, she focuses on transformer architectures, RLHF, and responsible AI development. Active contributor to open-source ML projects and speaker at NeurIPS.
+Keywords: AI researcher, machine learning engineer, OpenAI, LLM, large language models, AI safety, transformer, RLHF, San Francisco, NeurIPS, open source, deep learning, artificial intelligence, ML engineer
+
+KEYWORD-RICH SUMMARY:"""
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -56,18 +77,18 @@ Summary:"""
                     json={
                         "model": self.grok_model,
                         "messages": [
-                            {"role": "system", "content": "You are a professional profile summarizer. Create concise, searchable summaries."},
+                            {"role": "system", "content": "You are an expert at creating searchable profile summaries. Your summaries are packed with relevant keywords that help people find professionals through semantic search. Focus on job titles, skills, technologies, industries, and topics."},
                             {"role": "user", "content": prompt}
                         ],
-                        "max_tokens": 200,
-                        "temperature": 0.7,
+                        "max_tokens": 300,
+                        "temperature": 0.5,
                     }
                 )
                 
                 if response.status_code != 200:
                     print(f"Grok API error: {response.status_code} - {response.text}")
                     # Fallback to basic profile text if Grok fails
-                    return profile_text
+                    return profile_text + (posts_text if posts_text else "")
                 
                 data = response.json()
                 summary = data['choices'][0]['message']['content'].strip()
@@ -75,8 +96,8 @@ Summary:"""
                 
         except Exception as e:
             print(f"Error generating summary with Grok: {e}")
-            # Fallback to basic profile text
-            return profile_text
+            # Fallback to basic profile text + posts
+            return profile_text + (posts_text if posts_text else "")
     
     def generate_embedding(self, text: str) -> List[float]:
         """Generate embedding for a single text string"""
@@ -171,9 +192,9 @@ Summary:"""
         
         for profile in profiles:
             try:
-                # Step 1: Generate profile summary using Grok
+                # Step 1: Generate profile summary using Grok (posts would need to be fetched separately)
                 print(f"Generating summary for @{profile.username}...")
-                summary = await self.generate_profile_summary(profile)
+                summary = await self.generate_profile_summary(profile, posts=None)
                 
                 # Step 2: Generate embedding from summary
                 print(f"Generating embedding for @{profile.username}...")

@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from nexus.routes import health, items, user, network, profiles, scrape, tweets, generate_rag, graph_intelligence
+from nexus.routes import health, items, user, network, profiles, scrape, posts, generate_rag, graph_intelligence
 from nexus.db import engine
 from nexus.init_db import init
 import logging
