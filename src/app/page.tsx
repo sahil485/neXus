@@ -1,12 +1,29 @@
 "use client";
 
-import { useEffect, Suspense } from "react";
-import { Button } from "@/components/ui/button";
+import { useEffect, Suspense, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/components/AuthProvider";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { NetworkBackground } from "@/components/NetworkBackground";
 
-// X Logo SVG Component
+// Constants
+const ROTATING_WORDS = ["Your Social Universe", "Your Connections", "Your Opportunities", "Your Friends"];
+const INITIAL_DELAY_MS = 6000;
+const FAST_CYCLE_MS = 3000;
+
+// Animation variants for consistency
+const fadeInUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+};
+
+const wordAnimation = {
+  initial: { opacity: 0, y: 40, filter: "blur(8px)" },
+  animate: { opacity: 1, y: 0, filter: "blur(0px)" },
+  exit: { opacity: 0, y: -40, filter: "blur(8px)" },
+};
+
+// Reusable X Logo component
 function XLogo({ className = "w-6 h-6" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="currentColor">
@@ -15,127 +32,207 @@ function XLogo({ className = "w-6 h-6" }: { className?: string }) {
   );
 }
 
+// Logo component with X icon
+function Logo({ className = "", iconSize = "w-10 h-10" }: { className?: string; iconSize?: string }) {
+  return (
+    <span className={`text-4xl font-medium tracking-wide inline-flex items-center ${className}`}>
+      <span className="mr-[-4px] scale-y-125 origin-center -translate-y-[1px]">NE</span>
+      <XLogo className={`${iconSize}`} />
+      <span className="ml-[-4px] scale-y-125 origin-center -translate-y-[1px]">US</span>
+    </span>
+  );
+}
+
 function LandingPageContent() {
   const { user, isLoading, login } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const error = searchParams.get("error");
+  const [wordIndex, setWordIndex] = useState(0);
+  const [isCtaHovered, setIsCtaHovered] = useState(false);
+  const [isFirstRender, setIsFirstRender] = useState(true);
 
-  // Redirect if already logged in
+  // Word rotation - 4s on first word, then fast rotation
   useEffect(() => {
-    if (user && !isLoading) {
-      router.push("/dashboard");
-    }
+    const delay = isFirstRender ? INITIAL_DELAY_MS : FAST_CYCLE_MS;
+    
+    const timeout = setTimeout(() => {
+      setWordIndex((i) => (i + 1) % ROTATING_WORDS.length);
+      if (isFirstRender) setIsFirstRender(false);
+    }, delay);
+    
+    return () => clearTimeout(timeout);
+  }, [wordIndex, isFirstRender]);
+
+  // Auth redirect
+  useEffect(() => {
+    if (user && !isLoading) router.push("/dashboard");
   }, [user, isLoading, router]);
+
+  const handleCtaHover = useCallback((hovered: boolean) => () => setIsCtaHovered(hovered), []);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <XLogo className="w-16 h-16 text-white" />
+      <div className="h-screen bg-black flex items-center justify-center">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <Logo className="text-4xl text-white" />
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col md:flex-row">
-      {/* Left side - Logo (Large) */}
-      <div className="hidden md:flex flex-1 items-center justify-center p-8">
-        <XLogo className="w-[300px] h-[300px] lg:w-[380px] lg:h-[380px]" />
+    <div className="h-screen bg-black text-white overflow-hidden fixed inset-0">
+      <NetworkBackground />
+
+      {/* Gradient overlays */}
+      <div className="fixed inset-0 pointer-events-none z-[1]">
+        <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/80 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/80 to-transparent" />
+        <div 
+          className="absolute inset-0"
+          style={{ background: "radial-gradient(ellipse 60% 40% at 50% 50%, rgba(59,130,246,0.04) 0%, transparent 60%)" }}
+        />
       </div>
 
-      {/* Right side - Login Content */}
-      <div className="flex-1 flex flex-col justify-center px-8 md:px-12 lg:px-16 py-12">
-        <div className="md:hidden mb-12">
-          <XLogo className="w-12 h-12" />
-        </div>
+      {/* Navigation */}
+      <motion.nav
+        {...fadeInUp}
+        transition={{ duration: 0.6, delay: 0.2 }}
+        className="fixed top-0 left-0 z-50 pt-10 pl-10"
+      >
+        <motion.div whileHover={{ scale: 1.02 }} className="cursor-pointer">
+          <Logo />
+        </motion.div>
+      </motion.nav>
 
-        <div className="max-w-[600px] w-full">
-          <h1 className="text-[40px] md:text-[64px] font-extrabold tracking-tight mb-12 leading-tight">
-            Happening now
-          </h1>
+      {/* Hero */}
+      <main className="relative z-10 h-full flex flex-col items-center justify-center px-6">
+        <div className="text-center">
+          {/* Headlines */}
+          <motion.h1
+            {...fadeInUp}
+            transition={{ duration: 0.8, delay: 0.3 }}
+            className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-light tracking-tight leading-none"
+          >
+            Understand
+          </motion.h1>
 
-          <h2 className="text-[23px] md:text-[31px] font-bold mb-8">
-            Join Nexus today.
-          </h2>
-
-          <div className="w-[300px] space-y-4">
-            <Button
-              onClick={login}
-              className="w-full h-[40px] rounded-full bg-white text-black hover:bg-[#e6e6e6] font-bold text-[15px] border border-transparent transition-colors flex items-center justify-center gap-2"
-            >
-              <XLogo className="w-4 h-4" />
-              Sign in with X
-            </Button>
-            
-            <div className="relative flex items-center py-2">
-              <div className="flex-grow border-t border-[#2f3336]"></div>
-              <span className="flex-shrink-0 mx-2 text-[#e7e9ea] text-[15px]">or</span>
-              <div className="flex-grow border-t border-[#2f3336]"></div>
-            </div>
-
-            <Button
-              onClick={login}
-              className="w-full h-[40px] rounded-full bg-[#1d9bf0] text-white hover:bg-[#1a8cd8] font-bold text-[15px] border border-transparent transition-colors"
-            >
-              Create account
-            </Button>
-
-            <p className="text-[11px] text-[#71767b] leading-4 mt-2">
-              By signing up, you agree to the Terms of Service and Privacy Policy, including Cookie Use.
-            </p>
-
-            <div className="mt-12">
-              <h3 className="text-[17px] font-bold mb-4">Already have an account?</h3>
-              <Button
-                onClick={login}
-                variant="outline"
-                className="w-full h-[40px] rounded-full bg-transparent text-[#1d9bf0] border border-[#536471] hover:bg-[#1d9bf0]/10 font-bold text-[15px] transition-colors"
+          <div className="h-14 sm:h-16 md:h-20 lg:h-24 relative w-screen max-w-none -mx-6">
+            <AnimatePresence mode="wait">
+              <motion.h2
+                key={wordIndex}
+                variants={wordAnimation}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extralight tracking-tight text-slate-400 absolute inset-0 flex items-center justify-center whitespace-nowrap px-6"
               >
-                Sign in
-              </Button>
-            </div>
+                {ROTATING_WORDS[wordIndex]}
+              </motion.h2>
+            </AnimatePresence>
           </div>
-        </div>
-      </div>
 
-      {/* Footer */}
-      <footer className="fixed bottom-0 w-full p-4 bg-black hidden xl:block">
-        <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-[13px] text-[#71767b]">
-          <a href="#" className="hover:underline">About</a>
-          <a href="#" className="hover:underline">Download the X app</a>
-          <a href="#" className="hover:underline">Help Center</a>
-          <a href="#" className="hover:underline">Terms of Service</a>
-          <a href="#" className="hover:underline">Privacy Policy</a>
-          <a href="#" className="hover:underline">Cookie Policy</a>
-          <a href="#" className="hover:underline">Accessibility</a>
-          <a href="#" className="hover:underline">Ads info</a>
-          <a href="#" className="hover:underline">Blog</a>
-          <a href="#" className="hover:underline">Status</a>
-          <a href="#" className="hover:underline">Careers</a>
-          <a href="#" className="hover:underline">Brand Resources</a>
-          <a href="#" className="hover:underline">Advertising</a>
-          <a href="#" className="hover:underline">Marketing</a>
-          <a href="#" className="hover:underline">X for Business</a>
-          <a href="#" className="hover:underline">Developers</a>
-          <a href="#" className="hover:underline">Directory</a>
-          <a href="#" className="hover:underline">Settings</a>
-          <span>© 2024 Nexus for X</span>
+          {/* Subtitle */}
+          <motion.p
+            {...fadeInUp}
+            transition={{ duration: 0.6, delay: 0.7 }}
+            className="text-base sm:text-lg text-slate-500 max-w-lg mx-auto mt-6 font-light leading-relaxed"
+          >
+            AI-powered network intelligence for X.
+            <br className="hidden sm:block" />
+            Discover hidden connections and unlock your social graph.
+          </motion.p>
         </div>
-      </footer>
+
+        {/* CTA */}
+        <motion.div
+          {...fadeInUp}
+          transition={{ duration: 0.6, delay: 1 }}
+          className="mt-10 w-full max-w-sm"
+        >
+          <div
+            className="relative"
+            onMouseEnter={handleCtaHover(true)}
+            onMouseLeave={handleCtaHover(false)}
+          >
+            <motion.div
+              animate={{
+                boxShadow: isCtaHovered
+                  ? "0 0 60px rgba(59,130,246,0.2), 0 0 100px rgba(139,92,246,0.1)"
+                  : "0 0 30px rgba(59,130,246,0.08)",
+              }}
+              className="bg-slate-900/60 backdrop-blur-xl border border-slate-700/50 rounded-2xl overflow-hidden"
+            >
+              <motion.button
+                onClick={login}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                className="w-full px-8 py-4 flex items-center justify-center gap-3 group transition-colors hover:bg-white/[0.02]"
+              >
+                <span className="text-base font-medium">Continue with </span>
+                <XLogo className="w-5 h-5" />
+                <svg
+                  className="w-4 h-4 text-slate-500 group-hover:text-white group-hover:translate-x-0.5 transition-all"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              </motion.button>
+            </motion.div>
+
+            {/* Hover glow border */}
+            <motion.div
+              className="absolute -inset-px rounded-2xl pointer-events-none -z-10"
+              animate={{ opacity: isCtaHovered ? 0.5 : 0 }}
+              style={{
+                background: "linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4)",
+                backgroundSize: "200% 200%",
+                animation: isCtaHovered ? "gradient-shift 3s ease infinite" : "none",
+              }}
+            />
+          </div>
+
+          {/* Trust badges */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.4 }}
+            className="flex items-center justify-center gap-8 mt-6 text-xs text-slate-600 uppercase tracking-widest"
+          >
+            {[
+              { color: "bg-emerald-500", label: "Secure" },
+              { color: "bg-blue-500", label: "AI-Powered" },
+              { color: "bg-purple-500", label: "Real-time" },
+            ].map(({ color, label }) => (
+              <span key={label} className="flex items-center gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full ${color}`} />
+                {label}
+              </span>
+            ))}
+          </motion.div>
+        </motion.div>
+      </main>
+
+      <style jsx global>{`
+        @keyframes gradient-shift {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+      `}</style>
     </div>
   );
 }
 
-// Loading fallback
 function LoadingFallback() {
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <XLogo className="w-16 h-16 text-white animate-pulse" />
+    <div className="h-screen bg-black flex items-center justify-center">
+      <Logo className="text-4xl text-white" />
     </div>
   );
 }
 
-// Main export with Suspense wrapper
 export default function LandingPage() {
   return (
     <Suspense fallback={<LoadingFallback />}>
