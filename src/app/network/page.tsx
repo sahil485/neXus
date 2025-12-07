@@ -9,6 +9,7 @@ import {
   MoreHorizontal,
   LogOut,
   ArrowLeft,
+  Sparkles,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -130,6 +131,7 @@ export default function NetworkPage() {
   }
 
   const displayUser = user || {
+    x_user_id: "demo-user",
     name: "Demo User",
     username: "demouser",
     profile_image_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=demo",
@@ -351,8 +353,7 @@ export default function NetworkPage() {
       </main>
 
       <Sheet open={!!selectedProfile} onOpenChange={() => setSelectedProfile(null)}>
-        {/* ... (same sheet content) */}
-        <SheetContent className="bg-black border-l border-[#2f3336] text-[#e7e9ea] sm:max-w-[400px]">
+        <SheetContent className="bg-black/40 backdrop-blur-xl border-l border-white/10 text-[#e7e9ea] sm:max-w-[400px] shadow-2xl">
           {selectedProfile && (
             <>
               <SheetHeader>

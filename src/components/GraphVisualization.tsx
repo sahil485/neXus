@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { Loader2, Box, Circle } from "lucide-react";
+import { Loader2, Box, Circle, ZoomOut } from "lucide-react";
 import * as THREE from "three";
 
 // Dynamically import ForceGraph2D with no SSR
@@ -58,6 +58,7 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [highlightNodes, setHighlightNodes] = useState(new Set<string>());
   const [highlightLinks, setHighlightLinks] = useState(new Set<string>());
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -65,10 +66,10 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
     // Create nodes
     const nodes: GraphNode[] = [
       {
-        id: currentUser.x_user_id,
-        name: currentUser.name,
-        username: currentUser.username,
-        img: currentUser.profile_image_url,
+        id: currentUser.x_user_id || "current-user",
+        name: currentUser.name || "You",
+        username: currentUser.username || "you",
+        img: currentUser.profile_image_url || "",
         val: 20,
         degree: 0,
       },
@@ -99,9 +100,12 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
       links: validEdges,
     });
   }, [profiles, edges, currentUser]);
-  // Handle highlighting when selection changes
+
+  // Handle highlighting when selection OR hover changes
   useEffect(() => {
-    if (!selectedNodeId || !currentUser) {
+    const targetNodeId = hoveredNode || selectedNodeId;
+    
+    if (!targetNodeId || !currentUser) {
       setHighlightNodes(new Set());
       setHighlightLinks(new Set());
       return;
@@ -110,7 +114,7 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
     const nodesToHighlight = new Set<string>();
     const linksToHighlight = new Set<string>();
 
-    nodesToHighlight.add(selectedNodeId);
+    nodesToHighlight.add(targetNodeId);
     nodesToHighlight.add(currentUser.x_user_id);
 
     // Helper to find edge between two nodes
@@ -125,34 +129,31 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
       });
     };
 
-    const selectedNode = graphData.nodes.find(n => n.id === selectedNodeId);
+    const targetNode = graphData.nodes.find(n => n.id === targetNodeId);
     
-    if (selectedNode) {
-      if (selectedNode.degree === 1) {
+    if (targetNode) {
+      if (targetNode.degree === 1) {
         // Direct connection
-        const link = findEdge(currentUser.x_user_id, selectedNodeId);
+        const link = findEdge(currentUser.x_user_id, targetNodeId);
         if (link) {
           const sourceId = (link.source as any).id || link.source;
           const targetId = (link.target as any).id || link.target;
           linksToHighlight.add(sourceId === currentUser.x_user_id ? `${sourceId}-${targetId}` : `${targetId}-${sourceId}`);
           linksToHighlight.add(sourceId !== currentUser.x_user_id ? `${sourceId}-${targetId}` : `${targetId}-${sourceId}`);
-          // Just add both directions to be safe or use consistent key
           linksToHighlight.add(typeof link.source === 'object' ? `${(link.source as any).id}-${(link.target as any).id}` : `${link.source}-${link.target}`);
         }
-      } else if (selectedNode.degree === 2) {
+      } else if (targetNode.degree === 2) {
         // Find the bridge node (1st degree connection)
-        // Look for an edge where target is selectedNodeId (or source is selectedNodeId)
-        // The other end must be a 1st degree connection
         const bridgeLink = graphData.links.find((l: any) => {
           const sourceId = l.source.id || l.source;
           const targetId = l.target.id || l.target;
           
-          if (sourceId === selectedNodeId) {
-            const targetNode = graphData.nodes.find(n => n.id === targetId);
-            return targetNode?.degree === 1;
-          } else if (targetId === selectedNodeId) {
-            const sourceNode = graphData.nodes.find(n => n.id === sourceId);
-            return sourceNode?.degree === 1;
+          if (sourceId === targetNodeId) {
+            const target = graphData.nodes.find(n => n.id === targetId);
+            return target?.degree === 1;
+          } else if (targetId === targetNodeId) {
+            const source = graphData.nodes.find(n => n.id === sourceId);
+            return source?.degree === 1;
           }
           return false;
         });
@@ -160,7 +161,7 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
         if (bridgeLink) {
           const sourceId = (bridgeLink.source as any).id || bridgeLink.source;
           const targetId = (bridgeLink.target as any).id || bridgeLink.target;
-          const bridgeId = sourceId === selectedNodeId ? targetId : sourceId;
+          const bridgeId = sourceId === targetNodeId ? targetId : sourceId;
           
           nodesToHighlight.add(bridgeId);
           linksToHighlight.add(typeof bridgeLink.source === 'object' ? `${(bridgeLink.source as any).id}-${(bridgeLink.target as any).id}` : `${bridgeLink.source}-${bridgeLink.target}`);
@@ -176,7 +177,7 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
 
     setHighlightNodes(nodesToHighlight);
     setHighlightLinks(linksToHighlight);
-  }, [selectedNodeId, graphData, currentUser]);
+  }, [selectedNodeId, hoveredNode, graphData, currentUser]);
 
   return (
     <div className="w-full h-full bg-black rounded-lg overflow-hidden border border-[#2f3336] relative">
@@ -196,13 +197,22 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
           </div>
         </div>
 
-        <button
-          onClick={() => setIs3D(!is3D)}
-          className="bg-[#1d9bf0] hover:bg-[#1a8cd8] text-white p-2 rounded-lg shadow-lg pointer-events-auto transition-colors flex items-center gap-2"
-        >
-          {is3D ? <Circle className="w-4 h-4" /> : <Box className="w-4 h-4" />}
-          <span className="text-xs font-bold">{is3D ? "2D View" : "3D View"}</span>
-        </button>
+        <div className="flex gap-2 pointer-events-auto">
+          <button
+            onClick={() => fgRef.current?.zoomToFit(1000)}
+            className="bg-[#2f3336] hover:bg-[#1a8cd8] text-white p-2 rounded-lg shadow-lg transition-colors flex items-center justify-center"
+            title="Zoom Out / Reset"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setIs3D(!is3D)}
+            className="bg-[#1d9bf0] hover:bg-[#1a8cd8] text-white p-2 rounded-lg shadow-lg transition-colors flex items-center gap-2"
+          >
+            {is3D ? <Circle className="w-4 h-4" /> : <Box className="w-4 h-4" />}
+            <span className="text-xs font-bold">{is3D ? "2D View" : "3D View"}</span>
+          </button>
+        </div>
       </div>
       
       {graphData.nodes.length > 0 && (
@@ -212,6 +222,7 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
             graphData={graphData}
             nodeLabel="name"
             backgroundColor="#000000"
+            onNodeHover={(node: any) => setHoveredNode(node ? node.id : null)}
             linkColor={(link: any) => {
                const id = link.source.id ? `${link.source.id}-${link.target.id}` : `${link.source}-${link.target}`;
                return highlightLinks.has(id) ? "#1d9bf0" : "#2f3336";
@@ -240,25 +251,29 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
               return sprite;
             }}
             onNodeClick={(node: any) => {
-              // Aim at node from outside it
-              const distance = 40;
-              const distRatio = 1 + distance/Math.hypot(node.x, node.y, node.z);
+              if (node.id === selectedNodeId) {
+                fgRef.current?.zoomToFit(1000);
+              } else {
+                // Aim at node from outside it
+                const distance = 40;
+                const distRatio = 1 + distance/Math.hypot(node.x, node.y, node.z);
 
-              fgRef.current.cameraPosition(
-                { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio }, // new position
-                node, // lookAt ({ x, y, z })
-                3000  // ms transition duration
-              );
+                fgRef.current.cameraPosition(
+                  { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio }, // new position
+                  node, // lookAt ({ x, y, z })
+                  3000  // ms transition duration
+                );
+              }
               onNodeClick(node);
             }}
           />
         ) : (
           <ForceGraph2D
-            // ... existing 2D props ...
             ref={fgRef}
             graphData={graphData}
             nodeLabel="name"
             backgroundColor="#000000"
+            onNodeHover={(node: any) => setHoveredNode(node ? node.id : null)}
             linkColor={(link: any) => {
               const id = link.source.id ? `${link.source.id}-${link.target.id}` : `${link.source}-${link.target}`;
               const isHighlighted = highlightLinks.has(id);
@@ -298,27 +313,45 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
               ctx.shadowBlur = 0;
   
               // Draw image
-              const img = new Image();
-              img.src = node.img;
+              // Use cached image or create new one attached to node
+              if (!node.__img) {
+                node.__img = new Image();
+                node.__img.src = node.img;
+                // Force re-render when loaded (optional, loop usually handles it)
+              }
+              
+              const img = node.__img;
               
               // Save context
               ctx.save();
               ctx.beginPath();
               ctx.arc(node.x, node.y, size - 2, 0, 2 * Math.PI, false);
               ctx.clip();
-              try {
-                  ctx.drawImage(img, node.x - size + 2, node.y - size + 2, (size - 2) * 2, (size - 2) * 2);
-              } catch (e) {
-                  // Fallback or ignore if image not loaded yet
+              
+              if (img.complete && img.naturalWidth !== 0) {
+                try {
+                    ctx.drawImage(img, node.x - size + 2, node.y - size + 2, (size - 2) * 2, (size - 2) * 2);
+                } catch (e) {
+                    // Ignore
+                }
+              } else {
+                // Draw placeholder if image not ready
+                ctx.fillStyle = "#16181c";
+                ctx.fillRect(node.x - size + 2, node.y - size + 2, (size - 2) * 2, (size - 2) * 2);
               }
+              
               ctx.restore();
               
               ctx.globalAlpha = 1; // Reset alpha
             }}
             onNodeClick={(node: any) => {
-              // Center view on node
-              fgRef.current?.centerAt(node.x, node.y, 1000);
-              fgRef.current?.zoom(4, 2000);
+              if (node.id === selectedNodeId) {
+                fgRef.current?.zoomToFit(1000);
+              } else {
+                // Center view on node
+                fgRef.current?.centerAt(node.x, node.y, 1000);
+                fgRef.current?.zoom(4, 2000);
+              }
               onNodeClick(node);
             }}
           />

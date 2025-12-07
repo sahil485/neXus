@@ -400,6 +400,39 @@ files = [
 ]
 
 [[package]]
+name = "inngest"
+version = "0.5.13"
+description = "Python SDK for Inngest"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "inngest-0.5.13-py3-none-any.whl", hash = "sha256:b4c186f1c8c3952acd25929f8aa062df62bfcddfc7fae592848e57701d81e24e"},
+    {file = "inngest-0.5.13.tar.gz", hash = "sha256:fb715ea0339631e60a1fd3ac3f993ac01e9d6c0b0bd4d9acdcaf774da93e3b1f"},
+]
+
+[package.dependencies]
+httpx = ">=0.26.0"
+jcs = ">=0.2.1"
+pydantic = ">=2.11.0"
+typing-extensions = ">=4.13.0"
+
+[package.extras]
+connect = ["protobuf (>=5.29.4)", "psutil (>=6.0.0)", "websockets (>=15.0.0)"]
+
+[[package]]
+name = "jcs"
+version = "0.2.1"
+description = "JCS - JSON Canonicalization"
+optional = false
+python-versions = ">=3.6.2"
+groups = ["main"]
+files = [
+    {file = "jcs-0.2.1-py3-none-any.whl", hash = "sha256:e23a3e1de60f832d33cd811bb9c3b3be79219cdf95f63b88f0972732c3fa8476"},
+    {file = "jcs-0.2.1.tar.gz", hash = "sha256:9f20360b2f3b0a410d65493b448f96306d80e37fb46283f3f4aa5db2c7c1472b"},
+]
+
+[[package]]
 name = "packaging"
 version = "25.0"
 description = "Core utilities for Python packages"
@@ -1211,4 +1244,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "7087a811aab245320f50ed2e33fc8288cb9d33a5ab432af325881cab2b4a31bf"
+content-hash = "943e4b5cb9e803d3c6c82a72b6df1454fe1980fc428f6b4004e636f36a68aaff"
