@@ -4,12 +4,15 @@ Helper functions for scraping user data from Twitter API.
 
 import os
 import logging
+import asyncio
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
 from datetime import datetime
 
 from nexus.db.schema import UserDb, XProfile, XConnection, XPosts
+from nexus.services.twitter_client import TwitterClient
+from nexus.services.embeddings import EmbeddingsService
 from nexus.models.x_profile import XProfileCreate
 from nexus.services.twitter_client import TwitterClient
 
@@ -155,25 +158,68 @@ async def add_to_db(x_user_id: str, mutual: List[XProfileCreate], db: AsyncSessi
 
 
 async def scrape_connections(user: UserDb, db: AsyncSession) -> dict:
-    """Scrape connections ONLY - no posts. Returns connection data."""
-    logger.info(f"🔗 Starting connection scrape for user {user.username}")
-
+    """Scrape 1st and 2nd degree connections with RAG embeddings"""
+    print(f"Starting scrape for {user.username}...")
+    
+    # Step 1: Get 1st degree connections
+    print("Fetching 1st degree connections...")
     connections_data = await retrieve_connections(user.x_user_id)
-    profiles_added = await add_to_db(user.x_user_id, connections_data["mutual"], db, scrape_posts=False)
+    profiles_added = await add_to_db(user.x_user_id, connections_data["mutual"], db)
+    print(f"Added {profiles_added} 1st degree profiles")
 
+    # Step 2: Get 2nd degree connections in parallel batches
+    print("Fetching 2nd degree connections in parallel...")
     second_degree_mutuals = []
+    
+    async def process_mutual(mutual_profile, idx, total):
+        """Process one mutual connection's network"""
+        print(f"Processing {idx}/{total}: @{mutual_profile.username}")
+        try:
+            mutual_connections_data = await retrieve_connections(mutual_profile.x_user_id)
+            filtered_mutuals = [
+                profile for profile in mutual_connections_data["mutual"]
+                if profile.x_user_id != user.x_user_id
+            ]
+            await add_to_db(mutual_profile.x_user_id, filtered_mutuals, db)
+            return filtered_mutuals
+        except Exception as e:
+            print(f"Error processing @{mutual_profile.username}: {e}")
+            return []
+    
+    # Process in parallel batches of 5
+    batch_size = 5
+    total_mutuals = len(connections_data["mutual"])
+    
+    for i in range(0, total_mutuals, batch_size):
+        batch = connections_data["mutual"][i:i + batch_size]
+        tasks = [process_mutual(mutual, i + idx + 1, total_mutuals) for idx, mutual in enumerate(batch)]
+        batch_results = await asyncio.gather(*tasks)
+        
+        for result in batch_results:
+            second_degree_mutuals.extend(result)
+        
+        print(f"Batch {i//batch_size + 1} complete. 2nd degree so far: {len(second_degree_mutuals)}")
+    
+    print(f"Added {len(second_degree_mutuals)} 2nd degree profiles")
 
-    for idx, mutual_profile in enumerate(connections_data["mutual"], 1):
-        logger.info(f"  [{idx}/{len(connections_data['mutual'])}] Fetching connections for @{mutual_profile.username}")
-        mutual_connections_data = await retrieve_connections(mutual_profile.x_user_id)
-
-        filtered_mutuals = [
-            profile for profile in mutual_connections_data["mutual"]
-            if profile.x_user_id != user.x_user_id
-        ]
-
-        await add_to_db(mutual_profile.x_user_id, filtered_mutuals, db, scrape_posts=False)
-        second_degree_mutuals.extend(filtered_mutuals)
+    # Step 3: Generate RAG embeddings
+    print("Starting RAG ingestion...")
+    embeddings_result = {"processed": 0, "errors": 0}
+    
+    try:
+        embeddings_service = EmbeddingsService()
+        all_profile_ids = [p.x_user_id for p in connections_data["mutual"]]
+        all_profile_ids.extend([p.x_user_id for p in second_degree_mutuals])
+        unique_ids = list(set(all_profile_ids))
+        
+        print(f"Generating embeddings for {len(unique_ids)} unique profiles...")
+        embeddings_result = await embeddings_service.generate_embeddings_for_profiles(
+            db=db, x_user_ids=unique_ids, batch_size=50
+        )
+        print(f"RAG complete: {embeddings_result['message']}")
+    except Exception as e:
+        print(f"Error generating embeddings: {e}")
+        embeddings_result = {"processed": 0, "errors": len(unique_ids), "message": str(e)}
 
     logger.info(f"✅ Connection scrape complete: {len(connections_data['mutual'])} 1st degree, {len(second_degree_mutuals)} 2nd degree")
 
@@ -182,6 +228,8 @@ async def scrape_connections(user: UserDb, db: AsyncSession) -> dict:
         "profiles_added": profiles_added,
         "second_degree_mutuals": second_degree_mutuals,
         "second_degree_count": len(second_degree_mutuals),
+        "embeddings_generated": embeddings_result.get("processed", 0),
+        "embeddings_errors": embeddings_result.get("errors", 0),
     }
 
 

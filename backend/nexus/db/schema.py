@@ -1,5 +1,6 @@
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import String, Text, Boolean, BigInteger, ForeignKey, UniqueConstraint, ARRAY
+from pgvector.sqlalchemy import Vector
 from datetime import datetime
 from typing import Optional, List
 
@@ -14,7 +15,7 @@ class UserDb(Base):
     """App users - people who OAuth with our app"""
     __tablename__ = "users"
 
-    x_user_id: Mapped[str] = mapped_column(String(50), primary_key=True)  # Twitter's user ID
+    x_user_id: Mapped[str] = mapped_column(String(50), primary_key=True) 
     name: Mapped[str]
     username: Mapped[str] = mapped_column(unique=True, index=True)
     profile_pic: Mapped[str]
@@ -46,6 +47,8 @@ class XProfile(Base):
     is_protected: Mapped[bool] = mapped_column(Boolean, default=False)
     account_created_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     last_updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True) 
+    embedding = mapped_column(Vector(768), nullable=True) 
 
 
 # ============ X Follows (The Graph - who follows whom) ============

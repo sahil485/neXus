@@ -6,10 +6,8 @@ import {
   Home,
   Search,
   Users,
-  Sparkles,
   Loader2,
   RefreshCw,
-  Settings,
   LogOut,
   MoreHorizontal,
 } from "lucide-react";
@@ -38,9 +36,8 @@ function XLogo({ className = "w-6 h-6" }: { className?: string }) {
 }
 
 const navItems = [
-  { icon: Home, label: "Home", href: "/dashboard", active: false },
+  { icon: Home, label: "Home", href: "/dashboard", active: true },
   { icon: Users, label: "Network", href: "/network", active: false },
-  { icon: Sparkles, label: "Nexus Search", href: "/dashboard", active: true },
 ];
 
 export default function DashboardPage() {
@@ -203,7 +200,7 @@ export default function DashboardPage() {
       <main className="w-full max-w-[600px] border-x border-[#2f3336] min-h-screen relative">
         <div className="sticky top-0 z-50 bg-black/65 backdrop-blur-md border-b border-[#2f3336]">
           <div className="px-4 h-[53px] flex items-center justify-between">
-            <h1 className="text-xl font-bold">Nexus Search</h1>
+            <h1 className="text-xl font-bold">Home</h1>
             <button 
               onClick={handleStartIndexing}
               className="p-2 hover:bg-white/10 rounded-full transition-colors"

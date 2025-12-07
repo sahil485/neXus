@@ -28,7 +28,11 @@
     "next-auth": "^5.0.0-beta.30",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-force-graph-2d": "^1.29.0",
+    "react-force-graph-3d": "^1.29.0",
     "tailwind-merge": "^3.4.0",
+    "three": "^0.181.2",
+    "three-spritetext": "^1.10.0",
     "twitter-api-v2": "^1.28.0"
   },
   "devDependencies": {
@@ -36,6 +40,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.181.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.7",
     "tailwindcss": "^4",
