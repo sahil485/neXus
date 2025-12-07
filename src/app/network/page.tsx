@@ -64,6 +64,7 @@ export default function NetworkPage() {
   const [edges, setEdges] = useState<{ source: string; target: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"all" | "1st" | "2nd">("all");
+  const [viewMode, setViewMode] = useState<"list" | "graph">("list");
   const [selectedProfile, setSelectedProfile] = useState<NetworkProfile | null>(null);
   const [bridgeProfile, setBridgeProfile] = useState<NetworkProfile | null>(null);
 
@@ -170,7 +171,8 @@ export default function NetworkPage() {
           </nav>
 
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+             {/* ... (same dropdown) */}
+             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-3 p-3 w-full hover:bg-white/10 rounded-full transition-colors">
                 <Avatar className="w-10 h-10">
                   <AvatarImage src={displayUser.profile_image_url} />
@@ -197,129 +199,161 @@ export default function NetworkPage() {
       </header>
 
       {/* Main Content */}
-      <main className="w-full max-w-[600px] border-x border-[#2f3336] min-h-screen shrink-0">
+      <main className="flex-1 min-w-0 border-x border-[#2f3336] min-h-screen">
         <div className="sticky top-0 z-50 bg-black/65 backdrop-blur-md border-b border-[#2f3336]">
           <div className="px-4 py-3 flex items-center gap-4">
             <a href="/dashboard" className="hover:bg-white/10 rounded-full p-2 -ml-2 transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </a>
-            <div>
+            <div className="flex-1">
               <h1 className="text-xl font-bold">Your Extended Network</h1>
               <p className="text-[13px] text-[#71767b]">{profiles.length} connections</p>
             </div>
           </div>
           
-          {/* Tabs */}
+          {/* View Mode Tabs */}
           <div className="flex border-b border-[#2f3336]">
-            {[
-              { id: "all", label: "All", count: profiles.length },
-              { id: "1st", label: "1st Degree", count: firstDegreeCount },
-              { id: "2nd", label: "2nd Degree", count: secondDegreeCount },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className="flex-1 h-[53px] hover:bg-white/10 transition-colors relative flex items-center justify-center"
-              >
-                <span className={`font-medium text-[15px] ${activeTab === tab.id ? "font-bold text-[#e7e9ea]" : "text-[#71767b]"}`}>
-                  {tab.label}
-                  <span className="ml-2 text-[13px]">({tab.count})</span>
-                  {activeTab === tab.id && (
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[70px] h-[4px] bg-[#1d9bf0] rounded-full" />
-                  )}
-                </span>
-              </button>
-            ))}
+            <button
+              onClick={() => setViewMode("list")}
+              className="flex-1 h-[53px] hover:bg-white/10 transition-colors relative flex items-center justify-center"
+            >
+              <span className={`font-medium text-[15px] ${viewMode === "list" ? "font-bold text-[#e7e9ea]" : "text-[#71767b]"}`}>
+                List View
+                {viewMode === "list" && (
+                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[70px] h-[4px] bg-[#1d9bf0] rounded-full" />
+                )}
+              </span>
+            </button>
+            <button
+              onClick={() => setViewMode("graph")}
+              className="flex-1 h-[53px] hover:bg-white/10 transition-colors relative flex items-center justify-center"
+            >
+              <span className={`font-medium text-[15px] ${viewMode === "graph" ? "font-bold text-[#e7e9ea]" : "text-[#71767b]"}`}>
+                Graph View
+                {viewMode === "graph" && (
+                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[70px] h-[4px] bg-[#1d9bf0] rounded-full" />
+                )}
+              </span>
+            </button>
           </div>
+
+          {/* Sub-tabs for List View */}
+          {viewMode === "list" && (
+            <div className="flex border-b border-[#2f3336]">
+              {[
+                { id: "all", label: "All", count: profiles.length },
+                { id: "1st", label: "1st Degree", count: firstDegreeCount },
+                { id: "2nd", label: "2nd Degree", count: secondDegreeCount },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                  className="flex-1 h-[44px] hover:bg-white/10 transition-colors relative flex items-center justify-center"
+                >
+                  <span className={`text-[14px] ${activeTab === tab.id ? "font-bold text-[#e7e9ea]" : "text-[#71767b]"}`}>
+                    {tab.label} <span className="ml-1 text-[12px] opacity-70">({tab.count})</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Content */}
+        {/* Content Area */}
         {isLoading ? (
-          <div className="flex justify-center py-20">
+          <div className="flex justify-center py-20 h-[calc(100vh-120px)] items-center">
             <Loader2 className="w-8 h-8 text-[#1d9bf0] animate-spin" />
           </div>
-        ) : filteredProfiles.length > 0 ? (
-          <div>
-            {filteredProfiles.map((profile, index) => (
-              <motion.div
-                key={profile.x_user_id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.02 }}
-                className="border-b border-[#2f3336] hover:bg-white/[0.03] transition-colors p-4"
-              >
-                <div className="flex gap-3">
-                  <Avatar className="w-12 h-12">
-                    <AvatarImage src={profile.profile_image_url} />
-                    <AvatarFallback>{profile.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-[15px] hover:underline cursor-pointer truncate">
-                        {profile.name}
-                      </span>
-                      <Badge 
-                        variant="secondary" 
-                        className={`text-xs font-bold px-2 py-0 ${
-                          profile.degree === 1 ? "bg-[#1d9bf0] text-white" : "bg-[#00ba7c] text-white"
-                        }`}
-                      >
-                        {profile.degree === 1 ? "1st" : "2nd"}
-                      </Badge>
+        ) : viewMode === "list" ? (
+          <div className="max-w-[600px] mx-auto">
+            {filteredProfiles.length > 0 ? (
+              <div>
+                {filteredProfiles.map((profile, index) => (
+                  <motion.div
+                    key={profile.x_user_id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.02 }}
+                    className="border-b border-[#2f3336] hover:bg-white/[0.03] transition-colors p-4 cursor-pointer"
+                    onClick={() => {
+                        setSelectedProfile(profile);
+                        // Trigger bridge calculation if needed
+                        if (profile.degree === 2) {
+                             const edge = edges.find(e => 
+                              (e.target === profile.x_user_id || e.source === profile.x_user_id) && 
+                              profiles.find(p => p.x_user_id === (e.target === profile.x_user_id ? e.source : e.target))?.degree === 1
+                            );
+                            if (edge) {
+                              const bridgeId = edge.target === profile.x_user_id ? edge.source : edge.target;
+                              const bridge = profiles.find(p => p.x_user_id === bridgeId);
+                              setBridgeProfile(bridge || null);
+                            }
+                        }
+                    }}
+                  >
+                    <div className="flex gap-3">
+                      <Avatar className="w-12 h-12">
+                        <AvatarImage src={profile.profile_image_url} />
+                        <AvatarFallback>{profile.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-[15px] hover:underline cursor-pointer truncate">
+                            {profile.name}
+                          </span>
+                          <Badge 
+                            variant="secondary" 
+                            className={`text-xs font-bold px-2 py-0 ${
+                              profile.degree === 1 ? "bg-[#1d9bf0] text-white" : "bg-[#00ba7c] text-white"
+                            }`}
+                          >
+                            {profile.degree === 1 ? "1st" : "2nd"}
+                          </Badge>
+                        </div>
+                        <p className="text-[#71767b] text-[15px] mb-2">@{profile.username}</p>
+                        {profile.bio && (
+                          <p className="text-[15px] text-[#e7e9ea] line-clamp-2">{profile.bio}</p>
+                        )}
+                        <div className="flex items-center gap-4 mt-2 text-[#71767b] text-[13px]">
+                          <span><strong className="text-white">{profile.followers_count.toLocaleString()}</strong> followers</span>
+                          <span><strong className="text-white">{profile.following_count.toLocaleString()}</strong> following</span>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-[#71767b] text-[15px] mb-2">@{profile.username}</p>
-                    {profile.bio && (
-                      <p className="text-[15px] text-[#e7e9ea] line-clamp-2">{profile.bio}</p>
-                    )}
-                    <div className="flex items-center gap-4 mt-2 text-[#71767b] text-[13px]">
-                      <span><strong className="text-white">{profile.followers_count.toLocaleString()}</strong> followers</span>
-                      <span><strong className="text-white">{profile.following_count.toLocaleString()}</strong> following</span>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
+                <Users className="w-12 h-12 text-[#71767b] mb-4" />
+                <h3 className="text-xl font-bold mb-2">No connections yet</h3>
+                <p className="text-[#71767b] text-[15px] mb-6">
+                  Sync your network to start exploring connections
+                </p>
+                <a 
+                  href="/dashboard"
+                  className="bg-[#1d9bf0] hover:bg-[#1a8cd8] text-white font-bold rounded-full px-6 py-3 transition-colors"
+                >
+                  Go to Nexus Search
+                </a>
+              </div>
+            )}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
-            <Users className="w-12 h-12 text-[#71767b] mb-4" />
-            <h3 className="text-xl font-bold mb-2">No connections yet</h3>
-            <p className="text-[#71767b] text-[15px] mb-6">
-              Sync your network to start exploring connections
-            </p>
-            <a 
-              href="/dashboard"
-              className="bg-[#1d9bf0] hover:bg-[#1a8cd8] text-white font-bold rounded-full px-6 py-3 transition-colors"
-            >
-              Go to Nexus Search
-            </a>
+          <div className="h-[calc(100vh-106px)] w-full relative">
+            <GraphVisualization 
+              profiles={profiles} 
+              edges={edges} 
+              currentUser={displayUser}
+              onNodeClick={handleNodeClick}
+              selectedNodeId={selectedProfile?.x_user_id}
+            />
           </div>
         )}
       </main>
 
-      {/* Right Column - Graph Visualization */}
-      <div className="hidden lg:block flex-1 h-screen sticky top-0 p-6 overflow-hidden">
-        <div className="h-full flex flex-col">
-          <h2 className="text-xl font-bold mb-4">Network Graph</h2>
-          <div className="flex-1 min-h-0">
-            {isLoading ? (
-              <div className="w-full h-full bg-black rounded-lg border border-[#2f3336] flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-[#1d9bf0] animate-spin" />
-              </div>
-            ) : (
-              <GraphVisualization 
-                profiles={profiles} 
-                edges={edges} 
-                currentUser={displayUser}
-                onNodeClick={handleNodeClick}
-                selectedNodeId={selectedProfile?.x_user_id}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-
       <Sheet open={!!selectedProfile} onOpenChange={() => setSelectedProfile(null)}>
+        {/* ... (same sheet content) */}
         <SheetContent className="bg-black border-l border-[#2f3336] text-[#e7e9ea] sm:max-w-[400px]">
           {selectedProfile && (
             <>

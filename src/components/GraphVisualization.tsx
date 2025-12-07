@@ -2,10 +2,21 @@
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { Loader2 } from "lucide-react";
+import { Loader2, Box, Circle } from "lucide-react";
+import * as THREE from "three";
 
 // Dynamically import ForceGraph2D with no SSR
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-full">
+      <Loader2 className="w-8 h-8 text-[#1d9bf0] animate-spin" />
+    </div>
+  ),
+});
+
+// Dynamically import ForceGraph3D with no SSR
+const ForceGraph3D = dynamic(() => import("react-force-graph-3d"), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-full">
@@ -43,6 +54,7 @@ interface GraphVisualizationProps {
 
 export default function GraphVisualization({ profiles, edges, currentUser, onNodeClick, selectedNodeId }: GraphVisualizationProps) {
   const fgRef = useRef<any>(null);
+  const [is3D, setIs3D] = useState(false);
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [highlightNodes, setHighlightNodes] = useState(new Set<string>());
   const [highlightLinks, setHighlightLinks] = useState(new Set<string>());
@@ -70,18 +82,23 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
       })),
     ];
 
+    // Deep clone edges to avoid mutation by the graph library
+    const clonedEdges = edges.map(e => ({
+      source: typeof e.source === 'object' ? (e.source as any).id : e.source,
+      target: typeof e.target === 'object' ? (e.target as any).id : e.target
+    }));
+
     // Filter edges to ensure both source and target exist in nodes
     const nodeIds = new Set(nodes.map((n) => n.id));
-    const validEdges = edges.filter(
+    const validEdges = clonedEdges.filter(
       (e) => nodeIds.has(e.source) && nodeIds.has(e.target)
     );
 
     setGraphData({
-      nodes,
+      nodes: JSON.parse(JSON.stringify(nodes)),
       links: validEdges,
     });
   }, [profiles, edges, currentUser]);
-
   // Handle highlighting when selection changes
   useEffect(() => {
     if (!selectedNodeId || !currentUser) {
@@ -162,91 +179,150 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
   }, [selectedNodeId, graphData, currentUser]);
 
   return (
-    <div className="w-full h-full bg-black rounded-lg overflow-hidden border border-[#2f3336]">
-      <div className="absolute top-4 right-4 z-10 bg-black/80 p-2 rounded-lg border border-[#2f3336]">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="w-3 h-3 rounded-full bg-[#1d9bf0]"></div>
-          <span className="text-xs text-[#e7e9ea]">You</span>
+    <div className="w-full h-full bg-black rounded-lg overflow-hidden border border-[#2f3336] relative">
+      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 items-end pointer-events-none">
+        <div className="bg-black/80 p-2 rounded-lg border border-[#2f3336] pointer-events-auto">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-3 h-3 rounded-full bg-[#1d9bf0]"></div>
+            <span className="text-xs text-[#e7e9ea]">You</span>
+          </div>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-3 h-3 rounded-full bg-[#00ba7c]"></div>
+            <span className="text-xs text-[#e7e9ea]">1st Degree</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-[#71767b]"></div>
+            <span className="text-xs text-[#e7e9ea]">2nd Degree</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2 mb-1">
-          <div className="w-3 h-3 rounded-full bg-[#00ba7c]"></div>
-          <span className="text-xs text-[#e7e9ea]">1st Degree</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-[#71767b]"></div>
-          <span className="text-xs text-[#e7e9ea]">2nd Degree</span>
-        </div>
+
+        <button
+          onClick={() => setIs3D(!is3D)}
+          className="bg-[#1d9bf0] hover:bg-[#1a8cd8] text-white p-2 rounded-lg shadow-lg pointer-events-auto transition-colors flex items-center gap-2"
+        >
+          {is3D ? <Circle className="w-4 h-4" /> : <Box className="w-4 h-4" />}
+          <span className="text-xs font-bold">{is3D ? "2D View" : "3D View"}</span>
+        </button>
       </div>
       
       {graphData.nodes.length > 0 && (
-        <ForceGraph2D
-          ref={fgRef}
-          graphData={graphData}
-          nodeLabel="name"
-          backgroundColor="#000000"
-          linkColor={(link: any) => {
-            const id = link.source.id ? `${link.source.id}-${link.target.id}` : `${link.source}-${link.target}`;
-            const isHighlighted = highlightLinks.has(id);
-            if (highlightNodes.size > 0) {
-              return isHighlighted ? "#1d9bf0" : "#2f333620"; // Dim others
-            }
-            return "#2f3336";
-          }}
-          linkWidth={(link: any) => {
-            const id = link.source.id ? `${link.source.id}-${link.target.id}` : `${link.source}-${link.target}`;
-            return highlightLinks.has(id) ? 3 : 1;
-          }}
-          nodeRelSize={6}
-          nodeCanvasObject={(node: any, ctx, globalScale) => {
-            const size = node.val;
-            
-            // Check highlighting
-            const isHighlighted = highlightNodes.has(node.id);
-            const isDimmed = highlightNodes.size > 0 && !isHighlighted;
-            
-            // Apply opacity
-            ctx.globalAlpha = isDimmed ? 0.2 : 1;
+        is3D ? (
+          <ForceGraph3D
+            ref={fgRef}
+            graphData={graphData}
+            nodeLabel="name"
+            backgroundColor="#000000"
+            linkColor={(link: any) => {
+               const id = link.source.id ? `${link.source.id}-${link.target.id}` : `${link.source}-${link.target}`;
+               return highlightLinks.has(id) ? "#1d9bf0" : "#2f3336";
+            }}
+            linkWidth={(link: any) => {
+               const id = link.source.id ? `${link.source.id}-${link.target.id}` : `${link.source}-${link.target}`;
+               return highlightLinks.has(id) ? 2 : 0.5;
+            }}
+            linkOpacity={0.5}
+            nodeThreeObject={(node: any) => {
+              const imgTexture = new THREE.TextureLoader().load(node.img);
+              imgTexture.colorSpace = THREE.SRGBColorSpace;
+              const material = new THREE.SpriteMaterial({ map: imgTexture });
+              const sprite = new THREE.Sprite(material);
+              
+              const isHighlighted = highlightNodes.has(node.id);
+              const isDimmed = highlightNodes.size > 0 && !isHighlighted;
+              
+              const scale = node.val;
+              sprite.scale.set(scale, scale, 1);
+              
+              if (isDimmed) {
+                 material.opacity = 0.2;
+              }
+              
+              return sprite;
+            }}
+            onNodeClick={(node: any) => {
+              // Aim at node from outside it
+              const distance = 40;
+              const distRatio = 1 + distance/Math.hypot(node.x, node.y, node.z);
 
-            // Draw circle border
-            ctx.beginPath();
-            ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
-            ctx.fillStyle = node.degree === 0 ? "#1d9bf0" : node.degree === 1 ? "#00ba7c" : "#71767b";
-            if (isHighlighted && node.degree !== 0) {
-               ctx.shadowColor = "#1d9bf0";
-               ctx.shadowBlur = 15;
-            } else {
-               ctx.shadowBlur = 0;
-            }
-            ctx.fill();
-            
-            // Reset shadow for image
-            ctx.shadowBlur = 0;
-
-            // Draw image
-            const img = new Image();
-            img.src = node.img;
-            
-            // Save context
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(node.x, node.y, size - 2, 0, 2 * Math.PI, false);
-            ctx.clip();
-            try {
-                ctx.drawImage(img, node.x - size + 2, node.y - size + 2, (size - 2) * 2, (size - 2) * 2);
-            } catch (e) {
-                // Fallback or ignore if image not loaded yet
-            }
-            ctx.restore();
-            
-            ctx.globalAlpha = 1; // Reset alpha
-          }}
-          onNodeClick={(node: any) => {
-            // Center view on node
-            fgRef.current?.centerAt(node.x, node.y, 1000);
-            fgRef.current?.zoom(4, 2000);
-            onNodeClick(node);
-          }}
-        />
+              fgRef.current.cameraPosition(
+                { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio }, // new position
+                node, // lookAt ({ x, y, z })
+                3000  // ms transition duration
+              );
+              onNodeClick(node);
+            }}
+          />
+        ) : (
+          <ForceGraph2D
+            // ... existing 2D props ...
+            ref={fgRef}
+            graphData={graphData}
+            nodeLabel="name"
+            backgroundColor="#000000"
+            linkColor={(link: any) => {
+              const id = link.source.id ? `${link.source.id}-${link.target.id}` : `${link.source}-${link.target}`;
+              const isHighlighted = highlightLinks.has(id);
+              if (highlightNodes.size > 0) {
+                return isHighlighted ? "#1d9bf0" : "#2f333620"; // Dim others
+              }
+              return "#2f3336";
+            }}
+            linkWidth={(link: any) => {
+              const id = link.source.id ? `${link.source.id}-${link.target.id}` : `${link.source}-${link.target}`;
+              return highlightLinks.has(id) ? 3 : 1;
+            }}
+            nodeRelSize={6}
+            nodeCanvasObject={(node: any, ctx, globalScale) => {
+              const size = node.val;
+              
+              // Check highlighting
+              const isHighlighted = highlightNodes.has(node.id);
+              const isDimmed = highlightNodes.size > 0 && !isHighlighted;
+              
+              // Apply opacity
+              ctx.globalAlpha = isDimmed ? 0.2 : 1;
+  
+              // Draw circle border
+              ctx.beginPath();
+              ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
+              ctx.fillStyle = node.degree === 0 ? "#1d9bf0" : node.degree === 1 ? "#00ba7c" : "#71767b";
+              if (isHighlighted && node.degree !== 0) {
+                 ctx.shadowColor = "#1d9bf0";
+                 ctx.shadowBlur = 15;
+              } else {
+                 ctx.shadowBlur = 0;
+              }
+              ctx.fill();
+              
+              // Reset shadow for image
+              ctx.shadowBlur = 0;
+  
+              // Draw image
+              const img = new Image();
+              img.src = node.img;
+              
+              // Save context
+              ctx.save();
+              ctx.beginPath();
+              ctx.arc(node.x, node.y, size - 2, 0, 2 * Math.PI, false);
+              ctx.clip();
+              try {
+                  ctx.drawImage(img, node.x - size + 2, node.y - size + 2, (size - 2) * 2, (size - 2) * 2);
+              } catch (e) {
+                  // Fallback or ignore if image not loaded yet
+              }
+              ctx.restore();
+              
+              ctx.globalAlpha = 1; // Reset alpha
+            }}
+            onNodeClick={(node: any) => {
+              // Center view on node
+              fgRef.current?.centerAt(node.x, node.y, 1000);
+              fgRef.current?.zoom(4, 2000);
+              onNodeClick(node);
+            }}
+          />
+        )
       )}
     </div>
   );
