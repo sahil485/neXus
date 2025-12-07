@@ -76,10 +76,11 @@ export async function GET(request: NextRequest) {
 
     // Send user data to backend
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/api/users/upsert`, {
+      const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/api/users/upsert`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          x_user_id: userInfo.id,
           name: userInfo.name,
           username: userInfo.username,
           profile_pic: userInfo.profile_image_url,
@@ -88,6 +89,11 @@ export async function GET(request: NextRequest) {
           oauth_access_token: tokens.access_token,
         }),
       });
+      if (backendResponse.ok) {
+        console.log("User synced to backend successfully");
+      } else {
+        console.error("Backend sync failed:", await backendResponse.text());
+      }
     } catch (backendError) {
       console.error("Failed to sync user to backend:", backendError);
       // Continue anyway - frontend session is still valid

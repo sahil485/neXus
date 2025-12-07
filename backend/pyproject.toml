@@ -12,6 +12,8 @@ uvicorn = {extras = ["standard"], version = "^0.32.0"}
 sqlalchemy = "^2.0.44"
 asyncpg = "^0.31.0"
 greenlet = "^3.3.0"
+httpx = "^0.28.0"
+python-dotenv = "^1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.0"
