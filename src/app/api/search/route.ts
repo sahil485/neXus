@@ -36,36 +36,19 @@ async function generateEmbedding(text: string): Promise<number[]> {
   return data.embedding.values;
 }
 
-// Verify profiles with Grok - batch verification
-async function verifyProfilesWithGrok(
+// Verify a single profile with Grok (fast)
+async function verifySingleProfile(
   query: string,
-  profiles: any[]
-): Promise<{ verified: any[]; }> {
-  const apiKey = process.env.GROK_API_KEY;
+  profile: any,
+  apiKey: string
+): Promise<{ include: boolean; reason: string } | null> {
+  const profileInfo = `${profile.name} (@${profile.username}): ${profile.summary || profile.bio || "No bio"}`;
   
-  if (!apiKey || profiles.length === 0) {
-    return { verified: profiles };
-  }
+  const prompt = `Query: "${query}"
+Profile: ${profileInfo}
 
-  // Build profile summaries for Grok
-  const profileSummaries = profiles.map((p, i) => 
-    `[${i + 1}] ${p.name} (@${p.username}): ${p.summary || p.bio || "No bio available"}`
-  ).join("\n\n");
-
-  const prompt = `You are verifying search results for the query: "${query}"
-
-Here are the candidate profiles:
-${profileSummaries}
-
-For EACH profile, respond with a JSON array. For each profile include:
-- "index": the profile number (1-based)
-- "include": true if this person is relevant to the query, false if not
-- "reason": ONE sentence (max 15 words) explaining why they match the query. Be specific about their relevance.
-
-Only include profiles that are genuinely relevant. Be strict but fair.
-
-Respond ONLY with valid JSON array, no other text:
-[{"index": 1, "include": true, "reason": "..."}, ...]`;
+Is this person relevant to the query? Respond with JSON only:
+{"include": true/false, "reason": "one sentence why (max 12 words)"}`;
 
   try {
     const response = await fetch("https://api.x.ai/v1/chat/completions", {
@@ -77,50 +60,62 @@ Respond ONLY with valid JSON array, no other text:
       body: JSON.stringify({
         model: "grok-4-1-fast",
         messages: [
-          { role: "system", content: "You are a search result verification assistant. Respond only with valid JSON." },
+          { role: "system", content: "Respond only with valid JSON. Be strict - only include genuinely relevant results." },
           { role: "user", content: prompt }
         ],
-        max_tokens: 1000,
-        temperature: 0.3,
+        max_tokens: 80,
+        temperature: 0.2,
       }),
     });
 
-    if (!response.ok) {
-      console.error("Grok verification failed:", await response.text());
-      return { verified: profiles };
-    }
+    if (!response.ok) return null;
 
     const data = await response.json();
     const content = data.choices[0].message.content.trim();
     
-    // Parse JSON response
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      console.error("Could not parse Grok response:", content);
-      return { verified: profiles };
-    }
-
-    const verifications = JSON.parse(jsonMatch[0]);
+    // Parse JSON
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
     
-    // Filter and enhance profiles based on Grok's response
-    const verified = profiles
-      .map((profile, i) => {
-        const verification = verifications.find((v: any) => v.index === i + 1);
-        if (verification && verification.include) {
-          return {
-            ...profile,
-            grokReason: verification.reason,
-          };
-        }
-        return null;
-      })
-      .filter(Boolean);
+    return JSON.parse(jsonMatch[0]);
+  } catch {
+    return null;
+  }
+}
 
-    return { verified };
-  } catch (error) {
-    console.error("Grok verification error:", error);
+// Verify profiles with Grok - PARALLEL verification for speed
+async function verifyProfilesWithGrok(
+  query: string,
+  profiles: any[]
+): Promise<{ verified: any[]; }> {
+  const apiKey = process.env.GROK_API_KEY;
+  
+  if (!apiKey || profiles.length === 0) {
     return { verified: profiles };
   }
+
+  // Verify ALL profiles in parallel for maximum speed
+  const verificationPromises = profiles.map(profile => 
+    verifySingleProfile(query, profile, apiKey)
+  );
+  
+  const results = await Promise.all(verificationPromises);
+  
+  // Filter and enhance profiles based on results
+  const verified = profiles
+    .map((profile, i) => {
+      const result = results[i];
+      if (result && result.include) {
+        return {
+          ...profile,
+          grokReason: result.reason,
+        };
+      }
+      return null;
+    })
+    .filter(Boolean);
+
+  return { verified };
 }
 
 export async function POST(request: NextRequest) {
