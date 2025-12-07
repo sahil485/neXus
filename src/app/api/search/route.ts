@@ -2,6 +2,46 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 
+// ========== SEARCH CACHE ==========
+// Cache for dashboard search results
+// Key: (user_id, normalized_query) -> Value: (profiles, timestamp)
+const DASHBOARD_SEARCH_CACHE: Map<string, { profiles: any[]; timestamp: number }> = new Map();
+const CACHE_TTL_MS = 3600 * 1000; // 1 hour in milliseconds
+
+function getCacheKey(userId: string, query: string): string {
+  const normalized = query.toLowerCase().trim().replace(/\s+/g, " ");
+  return `${userId}:${normalized}`;
+}
+
+function getCachedSearch(userId: string, query: string): any[] | null {
+  const key = getCacheKey(userId, query);
+  const cached = DASHBOARD_SEARCH_CACHE.get(key);
+  
+  if (cached) {
+    const age = Date.now() - cached.timestamp;
+    if (age < CACHE_TTL_MS) {
+      console.log(`✅ Dashboard search cache HIT for "${query}" (age: ${Math.floor(age / 1000)}s)`);
+      return cached.profiles;
+    } else {
+      console.log(`⏰ Dashboard search cache EXPIRED for "${query}"`);
+      DASHBOARD_SEARCH_CACHE.delete(key);
+    }
+  }
+  
+  console.log(`❌ Dashboard search cache MISS for "${query}"`);
+  return null;
+}
+
+function cacheSearchResults(userId: string, query: string, profiles: any[]) {
+  const key = getCacheKey(userId, query);
+  DASHBOARD_SEARCH_CACHE.set(key, {
+    profiles,
+    timestamp: Date.now()
+  });
+  console.log(`💾 Cached ${profiles.length} profiles for dashboard search "${query}"`);
+}
+// ===================================
+
 // Generate embedding using Google Gemini
 async function generateEmbedding(text: string): Promise<number[]> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -53,7 +93,7 @@ BIO: ${bio}
 
 EVALUATE:
 Is there clear evidence in their bio that they fit the query and they are relevant to the search query?
-
+DO NOT MAKE UP USER INFO. ONLY RETURN TRUE IF THE USER IS RELEVANT TO THE SEARCH QUERY.
 
 RESPOND with JSON only:
 - If they ARE a good match: {"match":true,"why":"[specific 10-word reason citing their actual role/expertise]"}
@@ -163,6 +203,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check cache first
+    const cachedProfiles = getCachedSearch(session.user.x_user_id, query);
+    if (cachedProfiles !== null) {
+      // Return cached results
+      if (stream) {
+        // For streaming requests, send cached results quickly
+        const encoder = new TextEncoder();
+        const readableStream = new ReadableStream({
+          async start(controller) {
+            // Send skeleton first
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'skeleton', count: cachedProfiles.length })}\n\n`));
+            
+            // Send all cached profiles
+            for (const profile of cachedProfiles) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'profile', profile })}\n\n`));
+            }
+            
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done', cached: true })}\n\n`));
+            controller.close();
+          }
+        });
+        
+        return new Response(readableStream, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'X-Cache-Hit': 'true',
+          },
+        });
+      } else {
+        // Non-streaming cached response
+        return NextResponse.json({
+          success: true,
+          profiles: cachedProfiles,
+          count: cachedProfiles.length,
+          cached: true
+        }, {
+          headers: {
+            'X-Cache-Hit': 'true'
+          }
+        });
+      }
+    }
+
     // Generate embedding for the search query
     const queryEmbedding = await generateEmbedding(query);
 
@@ -206,41 +291,20 @@ export async function POST(request: NextRequest) {
       
       const readableStream = new ReadableStream({
         async start(controller) {
-          // Send all profiles immediately (unverified)
-          for (const profile of topProfiles) {
-            const formatted = {
-              id: profile.x_user_id,
-              x_user_id: profile.x_user_id,
-              username: profile.username,
-              name: profile.name,
-              bio: profile.bio,
-              summary: profile.summary,
-              profile_image_url: profile.profile_image_url,
-              followers_count: profile.followers_count,
-              following_count: profile.following_count,
-              degree: profile.degree,
-              matchLevel: getMatchLevel(profile.similarity),
-              aiReason: null,
-              verifying: true,
-            };
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'profile', profile: formatted })}\n\n`));
-          }
+          // Send skeleton count first so UI shows loading placeholders
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'skeleton', count: Math.min(topProfiles.length, 6) })}\n\n`));
           
-          // Now verify each profile and send updates
+          // Track all sent profiles for caching
+          const sentProfiles: any[] = [];
+          
+          // Verify each profile and ONLY send ones that pass verification
           if (apiKey) {
-            const verifyPromises = topProfiles.map(async (profile) => {
+            const verifyPromises = topProfiles.map(async (profile: any) => {
               const result = await verifySingleProfile(query, profile, apiKey);
               
-              if (result === null || result.include) {
-                // Include - send update with reason
-                // Use Grok reason if available, otherwise generate from bio
-                let aiReason = result?.reason;
-                if (!aiReason || aiReason.length < 5) {
-                  const bio = profile.summary || profile.bio || "";
-                  const firstSentence = bio.split(/[.!?]/)[0].trim();
-                  aiReason = firstSentence.length > 10 ? firstSentence : `Matches "${query}" in your network`;
-                }
-                const updated = {
+              // Only send profiles that Grok verifies as good matches WITH a reason
+              if (result && result.include && result.reason && result.reason.length > 5) {
+                const verified = {
                   id: profile.x_user_id,
                   x_user_id: profile.x_user_id,
                   username: profile.username,
@@ -252,21 +316,46 @@ export async function POST(request: NextRequest) {
                   following_count: profile.following_count,
                   degree: profile.degree,
                   matchLevel: getMatchLevel(profile.similarity),
-                  aiReason: aiReason,
+                  aiReason: result.reason,
                   verifying: false,
                   verified: true,
                 };
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'update', profile: updated })}\n\n`));
-              } else {
-                // Exclude - send remove signal
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'remove', id: profile.x_user_id })}\n\n`));
+                sentProfiles.push(verified);
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'profile', profile: verified })}\n\n`));
               }
+              // Don't send anything for non-matches - no remove animation
             });
             
             await Promise.all(verifyPromises);
+          } else {
+            // No API key - send all profiles without verification
+            for (const profile of topProfiles) {
+              const formatted = {
+                id: profile.x_user_id,
+                x_user_id: profile.x_user_id,
+                username: profile.username,
+                name: profile.name,
+                bio: profile.bio,
+                summary: profile.summary,
+                profile_image_url: profile.profile_image_url,
+                followers_count: profile.followers_count,
+                following_count: profile.following_count,
+                degree: profile.degree,
+                matchLevel: getMatchLevel(profile.similarity),
+                aiReason: null,
+                verifying: false,
+              };
+              sentProfiles.push(formatted);
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'profile', profile: formatted })}\n\n`));
+            }
           }
           
-          // Signal done
+          // Cache the results for next time
+          if (sentProfiles.length > 0) {
+            cacheSearchResults(session.user.x_user_id, query, sentProfiles);
+          }
+          
+          // Signal done - UI will hide remaining skeletons
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
           controller.close();
         }
@@ -277,6 +366,7 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
           'Connection': 'keep-alive',
+          'X-Cache-Hit': 'false',
         },
       });
     }
@@ -284,7 +374,7 @@ export async function POST(request: NextRequest) {
     // Non-streaming: wait for all verifications
     const verificationPromise = verifyProfilesWithGrok(query, topProfiles);
     const timeoutPromise = new Promise<{ verified: any[] }>((resolve) => 
-      setTimeout(() => resolve({ verified: topProfiles.map(p => ({ ...p, grokReason: null })) }), 2000)
+      setTimeout(() => resolve({ verified: topProfiles.map((p: any) => ({ ...p, grokReason: null })) }), 2000)
     );
     
     const { verified } = await Promise.race([verificationPromise, timeoutPromise]);
@@ -305,10 +395,17 @@ export async function POST(request: NextRequest) {
       verifying: false,
     }));
 
+    // Cache the results for next time
+    cacheSearchResults(session.user.x_user_id, query, formattedProfiles);
+
     return NextResponse.json({
       success: true,
       profiles: formattedProfiles,
       count: formattedProfiles.length,
+    }, {
+      headers: {
+        'X-Cache-Hit': 'false'
+      }
     });
   } catch (error) {
     console.error("Search error:", error);

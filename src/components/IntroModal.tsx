@@ -52,19 +52,41 @@ export function IntroModal({
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Simulate AI generation when modal opens
+  // Generate intro with Grok when modal opens
+  const generateIntro = async () => {
+    if (!profile) return;
+    
+    setIsGenerating(true);
+    setError(null);
+    
+    try {
+      const response = await fetch("/api/generate-intro", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile, currentUser }),
+      });
+      
+      if (!response.ok) throw new Error("Failed to generate");
+      
+      const data = await response.json();
+      setMessage(data.message);
+    } catch (e) {
+      console.error("Error generating intro:", e);
+      setError("Failed to generate intro. Please try again.");
+      // Fallback to sample
+      setMessage(generateSampleIntro(profile, currentUser));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen && profile) {
-      setIsGenerating(true);
-      // Simulate API call
-      const timer = setTimeout(() => {
-        setMessage(generateSampleIntro(profile, currentUser));
-        setIsGenerating(false);
-      }, 1500);
-      return () => clearTimeout(timer);
+      generateIntro();
     }
-  }, [isOpen, profile, currentUser]);
+  }, [isOpen, profile]);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message);
@@ -73,11 +95,7 @@ export function IntroModal({
   };
 
   const handleRegenerate = () => {
-    setIsGenerating(true);
-    setTimeout(() => {
-      setMessage(generateSampleIntro(profile!, currentUser, true));
-      setIsGenerating(false);
-    }, 1500);
+    generateIntro();
     onRegenerate?.();
   };
 
@@ -109,7 +127,7 @@ export function IntroModal({
       <DialogContent className="sm:max-w-lg bg-black border-white/20 p-0 overflow-hidden" showCloseButton={false}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-          <span className="font-bold">New Message</span>
+          <DialogTitle className="font-bold text-base">New Message</DialogTitle>
           <button
             onClick={onClose}
             className="p-2 -mr-2 rounded-full hover:bg-white/10 transition-colors"

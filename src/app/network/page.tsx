@@ -97,14 +97,15 @@ export default function NetworkPage() {
     setLoadingTopics(true);
     try {
       // Fetch topic colors first
-      const colorsResponse = await fetch('http://localhost:8000/api/graph/topics/colors');
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+      const colorsResponse = await fetch(`${backendUrl}/api/graph/topics/colors`);
       if (colorsResponse.ok) {
         const colorsData = await colorsResponse.json();
         setTopicColors(colorsData.colors);
       }
 
       // Fetch topic clustering
-      const response = await fetch('http://localhost:8000/api/graph/topics/cluster', {
+      const response = await fetch(`${backendUrl}/api/graph/topics/cluster`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ x_user_id: user.x_user_id })
