@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
 from datetime import datetime
 
-from nexus.db.schema import UserDb, XProfile, XConnection
+from nexus.db.schema import UserDb, XProfile, XConnection, XPosts
 from nexus.services.twitter_client import TwitterClient
 from nexus.models.x_profile import XProfileCreate
 
@@ -38,7 +38,47 @@ async def retrieve_connections(x_user_id: str) -> dict:
     }
 
 
-async def add_to_db(x_user_id: str, mutual: List[XProfileCreate], db: AsyncSession) -> int:
+async def scrape_posts_for_profiles(profiles: List[XProfileCreate], db: AsyncSession) -> int:
+    """Scrape the 50 most recent posts for each profile and store them"""
+    bearer_token = os.getenv("BEARER_TOKEN")
+    if not bearer_token:
+        print("⚠️ BEARER_TOKEN not configured - skipping posts scraping")
+        return 0
+
+    client = TwitterClient(bearer_token)
+    posts_added = 0
+
+    for profile in profiles:
+        # Skip protected accounts
+        if profile.is_protected:
+            continue
+
+        try:
+            posts_text = await client.get_user_posts_text(profile.x_user_id, count=50)
+            
+            if posts_text:
+                stmt = insert(XPosts).values(
+                    x_user_id=profile.x_user_id,
+                    posts=posts_text,
+                    discovered_at=datetime.utcnow()
+                ).on_conflict_do_update(
+                    index_elements=['x_user_id'],
+                    set_={
+                        'posts': posts_text,
+                        'discovered_at': datetime.utcnow()
+                    }
+                )
+                await db.execute(stmt)
+                posts_added += 1
+                print(f"📝 Scraped {len(posts_text)} posts for @{profile.username}")
+        except Exception as e:
+            print(f"⚠️ Failed to scrape posts for @{profile.username}: {e}")
+            continue
+
+    return posts_added
+
+
+async def add_to_db(x_user_id: str, mutual: List[XProfileCreate], db: AsyncSession, scrape_posts: bool = True) -> int:
     profiles_added = 0
     for profile_data in mutual:
         account_created_at = profile_data.account_created_at
@@ -88,6 +128,11 @@ async def add_to_db(x_user_id: str, mutual: List[XProfileCreate], db: AsyncSessi
         }
     )
     await db.execute(connection_stmt)
+
+    # Scrape posts for all mutual profiles
+    if scrape_posts and mutual:
+        print(f"📝 Scraping posts for {len(mutual)} profiles...")
+        await scrape_posts_for_profiles(mutual, db)
 
     await db.commit()
 

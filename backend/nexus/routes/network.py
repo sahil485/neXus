@@ -8,7 +8,7 @@ from sqlalchemy import select, func
 from typing import List
 
 from nexus.utils import get_db
-from nexus.db.schema import UserDb, XProfile, XConnection, XTweet
+from nexus.db.schema import UserDb, XProfile, XConnection, XPosts
 from nexus.models import XProfileResponse, NetworkStats
 
 router = APIRouter(tags=["network"])
@@ -97,10 +97,10 @@ async def get_network_stats(username: str, db: AsyncSession = Depends(get_db)):
         first_count = first_degree_count.scalar() or 0
 
     profiles_count = await db.execute(select(func.count(XProfile.x_user_id)))
-    tweets_count = await db.execute(select(func.count(XTweet.tweet_id)))
+    posts_count = await db.execute(select(func.count(XPosts.x_user_id)))
 
     return NetworkStats(
         first_degree_count=first_count,
         profiles_indexed=profiles_count.scalar() or 0,
-        tweets_indexed=tweets_count.scalar() or 0
+        posts_indexed=posts_count.scalar() or 0
     )

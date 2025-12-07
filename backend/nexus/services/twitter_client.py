@@ -209,6 +209,11 @@ class TwitterClient:
         
         return all_tweets[:count]
 
+    async def get_user_posts_text(self, user_id: str, count: int = 50) -> List[str]:
+        """Get just the text content of a user's posts as a list of strings"""
+        tweets = await self.get_user_tweets_batch(user_id, count)
+        return [tweet.content for tweet in tweets]
+
     def _parse_user(self, data: Dict[str, Union[str, int, bool, Dict[str, int]]]) -> XProfileCreate:
         metrics = data.get("public_metrics", {})
         

@@ -1,30 +1,35 @@
 """
-Tweet data retrieval routes.
+Posts data retrieval routes.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
 
 from nexus.utils import get_db
-from nexus.db.schema import XTweet
-from nexus.models import XTweetResponse
+from nexus.db.schema import XPosts
 
-router = APIRouter(tags=["tweets"])
+router = APIRouter(tags=["posts"])
 
 
-@router.get("/tweets/{x_user_id}/get", response_model=List[XTweetResponse])
-async def get_user_tweets(
+@router.get("/posts/{x_user_id}")
+async def get_user_posts(
     x_user_id: str,
-    limit: int = 50,
     db: AsyncSession = Depends(get_db)
 ):
-    """Get stored tweets for a user"""
+    """Get stored posts for a user as array of strings"""
     result = await db.execute(
-        select(XTweet)
-        .where(XTweet.author_id == x_user_id)
-        .order_by(XTweet.created_at.desc())
-        .limit(limit)
+        select(XPosts).where(XPosts.x_user_id == x_user_id)
     )
-    return result.scalars().all()
+    posts_record = result.scalar_one_or_none()
+    
+    if not posts_record:
+        raise HTTPException(status_code=404, detail="No posts found for this user")
+    
+    return {
+        "x_user_id": posts_record.x_user_id,
+        "posts": posts_record.posts,
+        "posts_count": len(posts_record.posts),
+        "discovered_at": posts_record.discovered_at
+    }
