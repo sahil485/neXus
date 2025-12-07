@@ -3,22 +3,20 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Users,
-  MessageSquare,
-  TrendingUp,
-  Sparkles,
-  RefreshCw,
-  Filter,
-  ChevronDown,
-  Loader2,
-  Search,
-  Zap,
   Home,
+  Search,
   Bell,
   Mail,
-  Bookmark,
+  User,
+  MoreHorizontal,
   Settings,
   LogOut,
+  Sparkles,
+  Zap,
+  Filter,
+  Loader2,
+  X,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,10 +25,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SearchBar } from "@/components/SearchBar";
@@ -48,105 +46,58 @@ function XLogo({ className = "w-6 h-6" }: { className?: string }) {
   );
 }
 
-// Mock data for demo
+// Mock data
 const mockProfiles: Profile[] = [
   {
     id: "1",
     x_user_id: "123456",
     username: "sarahtech",
     name: "Sarah Chen",
-    bio: "Building the future of AI @ Anthropic. Previously Google Brain. Stanford CS PhD. Passionate about safe AI development and research.",
+    bio: "Building safe AI @ Anthropic. Stanford CS PhD. Previously Google Brain.",
     followers_count: 45200,
     following_count: 892,
     profile_image_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
     degree: 1,
-    matchReason: "Works on AI safety, similar to your interests",
-    topics: ["AI Safety", "Machine Learning", "Research"],
+    matchReason: "Works on AI safety",
+    topics: ["AI Safety", "ML", "Research"],
   },
   {
     id: "2",
     x_user_id: "234567",
     username: "vcmark",
     name: "Mark Thompson",
-    bio: "General Partner @ Sequoia Capital. Investing in ambitious founders building transformative companies. Previously founder (2x exit).",
+    bio: "GP @ Sequoia. Investing in AI-native companies. 2x Founder.",
     followers_count: 128000,
     following_count: 1240,
     profile_image_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=mark",
     degree: 2,
-    matchReason: "Actively investing in AI startups",
-    relevantTweet: "Just led our largest AI investment ever. The next decade belongs to AI-native companies.",
-    topics: ["VC", "Startups", "AI Investment"],
+    matchReason: "Investing in AI startups",
+    relevantTweet: "The next decade belongs to AI-native companies.",
+    topics: ["VC", "Startups", "AI"],
   },
   {
     id: "3",
     x_user_id: "345678",
     username: "designerjess",
     name: "Jessica Wu",
-    bio: "Head of Design @ Figma. Previously Airbnb, IDEO. Making design tools for everyone. Design systems enthusiast.",
+    bio: "Head of Design @ Figma. Making tools for everyone.",
     followers_count: 89300,
     following_count: 567,
     profile_image_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=jessica",
     degree: 1,
-    matchReason: "Connected through design community",
-    topics: ["Design", "Product", "Design Systems"],
-  },
-  {
-    id: "4",
-    x_user_id: "456789",
-    username: "cryptoalex",
-    name: "Alex Rivera",
-    bio: "Co-founder @ DeFi Protocol. Building decentralized financial infrastructure. Ex-Goldman Sachs. Stanford MBA.",
-    followers_count: 67800,
-    following_count: 2100,
-    profile_image_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=alex",
-    degree: 3,
-    matchReason: "Mentioned blockchain + AI intersection",
-    topics: ["DeFi", "Crypto", "Fintech"],
-  },
-  {
-    id: "5",
-    x_user_id: "567890",
-    username: "climatefounder",
-    name: "Emma Green",
-    bio: "CEO @ CleanTech Ventures. Fighting climate change with technology. YC W21. Forbes 30 Under 30.",
-    followers_count: 34500,
-    following_count: 890,
-    profile_image_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=emma",
-    degree: 2,
-    matchReason: "Climate tech focus aligns with sustainability interests",
-    relevantTweet: "Climate tech is having its moment. We need more builders in this space.",
-    topics: ["Climate Tech", "Sustainability", "Startups"],
-  },
-  {
-    id: "6",
-    x_user_id: "678901",
-    username: "neuroscientist",
-    name: "Dr. James Park",
-    bio: "Neuroscience researcher @ MIT. Studying brain-computer interfaces. Passionate about the intersection of neuroscience and AI.",
-    followers_count: 23100,
-    following_count: 445,
-    profile_image_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=james",
-    degree: 2,
-    matchReason: "Research overlaps with AI and neuroscience",
-    topics: ["Neuroscience", "BCI", "AI Research"],
+    matchReason: "Design community",
+    topics: ["Design", "Product"],
   },
 ];
 
-const mockStats = {
-  totalConnections: 2847,
-  firstDegree: 342,
-  secondDegree: 1205,
-  thirdDegree: 1300,
-  tweetsIndexed: 14280,
-  profilesAnalyzed: 892,
-};
-
 const navItems = [
-  { icon: Home, label: "Home", active: true },
+  { icon: Home, label: "Home", active: false },
   { icon: Search, label: "Explore", active: false },
   { icon: Bell, label: "Notifications", active: false },
   { icon: Mail, label: "Messages", active: false },
-  { icon: Bookmark, label: "Bookmarks", active: false },
+  { icon: Sparkles, label: "Nexus", active: true },
+  { icon: User, label: "Profile", active: false },
+  { icon: MoreHorizontal, label: "More", active: false },
 ];
 
 export default function DashboardPage() {
@@ -161,53 +112,33 @@ export default function DashboardPage() {
   const [isIntroModalOpen, setIsIntroModalOpen] = useState(false);
   const [isIndexing, setIsIndexing] = useState(false);
   const [indexProgress, setIndexProgress] = useState(0);
-  const [filters, setFilters] = useState({
-    degrees: [1, 2, 3] as number[],
-    minFollowers: 0,
-  });
+  const [activeTab, setActiveTab] = useState("for-you");
 
-  // Check demo mode from URL
+  // Demo mode check
   const [isDemo, setIsDemo] = useState(false);
-  
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setIsDemo(params.get("demo") === "true");
   }, []);
 
-  // Redirect if not authenticated and not in demo mode
   useEffect(() => {
     if (!authLoading && !user && !isDemo) {
       router.push("/");
     }
   }, [authLoading, user, isDemo, router]);
 
-  // Simulate search
   const handleSearch = async (query: string) => {
     setIsSearching(true);
     setSearchQuery(query);
     setHasSearched(true);
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    // Filter mock profiles based on query (in real app, this would be semantic search)
-    const results = mockProfiles.filter((profile) =>
-      filters.degrees.includes(profile.degree)
-    );
-    setSearchResults(results);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    setSearchResults(mockProfiles);
     setIsSearching(false);
-  };
-
-  const handleGenerateIntro = (profile: Profile) => {
-    setSelectedProfile(profile);
-    setIsIntroModalOpen(true);
   };
 
   const handleStartIndexing = async () => {
     setIsIndexing(true);
     setIndexProgress(0);
-
-    // Simulate indexing progress
     const interval = setInterval(() => {
       setIndexProgress((prev) => {
         if (prev >= 100) {
@@ -215,21 +146,11 @@ export default function DashboardPage() {
           setIsIndexing(false);
           return 100;
         }
-        return prev + Math.random() * 15;
+        return prev + 10;
       });
-    }, 500);
+    }, 200);
   };
 
-  const toggleDegreeFilter = (degree: number) => {
-    setFilters((prev) => ({
-      ...prev,
-      degrees: prev.degrees.includes(degree)
-        ? prev.degrees.filter((d) => d !== degree)
-        : [...prev.degrees, degree],
-    }));
-  };
-
-  // Show loading state
   if (authLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -245,365 +166,255 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="flex">
-        {/* Left Sidebar */}
-        <aside className="hidden lg:flex flex-col w-[275px] h-screen sticky top-0 border-r border-white/10 px-3 py-4">
+    <div className="min-h-screen bg-black text-[#e7e9ea] flex justify-center">
+      {/* Left Sidebar */}
+      <header className="hidden sm:flex flex-col items-end w-[88px] xl:w-[275px] h-screen sticky top-0 px-2">
+        <div className="w-full xl:w-[251px] flex flex-col h-full pb-4">
           {/* Logo */}
-          <div className="px-3 mb-4">
-            <div className="w-12 h-12 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer">
-              <XLogo className="w-7 h-7" />
+          <div className="py-2 xl:px-0">
+            <div className="w-[50px] h-[50px] flex items-center justify-center hover:bg-white/10 rounded-full cursor-pointer transition-colors">
+              <XLogo className="w-[30px] h-[30px]" />
             </div>
           </div>
 
           {/* Nav Items */}
-          <nav className="flex-1 space-y-1">
+          <nav className="mt-2 space-y-1 mb-4 flex-1">
             {navItems.map((item) => (
-              <button
+              <a
                 key={item.label}
-                className={`flex items-center gap-4 w-full px-4 py-3 rounded-full hover:bg-white/10 transition-colors ${
-                  item.active ? "font-bold" : ""
-                }`}
+                href="#"
+                className="group flex items-center xl:gap-5 p-3 w-fit xl:w-full hover:bg-white/10 rounded-full transition-colors"
               >
-                <item.icon className={`w-6 h-6 ${item.active ? "" : "opacity-80"}`} />
-                <span className="text-xl">{item.label}</span>
-              </button>
+                <item.icon className={`w-[26px] h-[26px] ${item.active ? "stroke-[2.5px]" : "stroke-[2px]"}`} />
+                <span className={`hidden xl:block text-xl ${item.active ? "font-bold" : "font-normal"}`}>
+                  {item.label}
+                </span>
+              </a>
             ))}
             
-            {/* Nexus-specific nav */}
-            <div className="pt-4 mt-4 border-t border-white/10">
-              <button className="flex items-center gap-4 w-full px-4 py-3 rounded-full bg-[#1d9bf0]/10 text-[#1d9bf0] font-bold">
-                <Sparkles className="w-6 h-6" />
-                <span className="text-xl">Nexus Search</span>
-              </button>
-            </div>
+            {/* Post Button */}
+            <button className="mt-4 w-[50px] h-[50px] xl:w-full xl:h-[52px] bg-[#1d9bf0] hover:bg-[#1a8cd8] rounded-full flex items-center justify-center transition-colors shadow-md">
+              <div className="xl:hidden">
+                <svg viewBox="0 0 24 24" className="w-6 h-6 fill-white">
+                  <path d="M23 3c-6.62-.1-10.38 2.421-13.05 6.03C7.29 12.61 6 17.331 6 22h2c0-1.007.07-2.012.19-3H12c4.1 0 7.48-3.082 7.94-7.054C22.79 10.147 23.17 6.359 23 3zm-7 8h-1.5v2H16c.63-.016 1.2-.08 1.72-.188C16.95 15.24 14.68 17 12 17H8.55c.57-2.512 1.57-4.851 3-6.78 2.16-2.912 5.29-4.911 9.45-5.187C20.95 8.079 19.9 11 16 11zM4 9V6H1V4h3V1h2v3h3v2H6v3H4z" />
+                </svg>
+              </div>
+              <span className="hidden xl:block text-white font-bold text-[17px]">Post</span>
+            </button>
           </nav>
 
-          {/* User menu */}
+          {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-3 w-full p-3 rounded-full hover:bg-white/10 transition-colors">
+              <button className="flex items-center gap-3 p-3 w-full hover:bg-white/10 rounded-full transition-colors">
                 <Avatar className="w-10 h-10">
                   <AvatarImage src={displayUser.profile_image_url} />
                   <AvatarFallback>{displayUser.name?.slice(0, 2).toUpperCase()}</AvatarFallback>
                 </Avatar>
-                <div className="flex-1 text-left hidden xl:block">
-                  <div className="font-bold text-sm truncate">{displayUser.name}</div>
-                  <div className="text-gray-500 text-sm">@{displayUser.username}</div>
+                <div className="hidden xl:block flex-1 text-left leading-5">
+                  <div className="font-bold text-[15px] truncate">{displayUser.name}</div>
+                  <div className="text-[#71767b] text-[15px] truncate">@{displayUser.username}</div>
                 </div>
-                <ChevronDown className="w-4 h-4 text-gray-500 hidden xl:block" />
+                <MoreHorizontal className="hidden xl:block w-4 h-4 text-[#e7e9ea]" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64 bg-black border-white/20">
-              <DropdownMenuLabel className="text-gray-400">My Account</DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-white/10" />
-              <DropdownMenuItem className="hover:bg-white/10 cursor-pointer">
-                <Settings className="w-4 h-4 mr-2" />
-                Settings
+            <DropdownMenuContent align="end" className="w-[300px] bg-black border-[#2f3336] text-[#e7e9ea] shadow-[0_0_15px_rgba(255,255,255,0.1)] rounded-xl py-3">
+              <DropdownMenuItem className="py-3 px-4 font-bold text-[15px] hover:bg-white/5 cursor-pointer">
+                Add an existing account
               </DropdownMenuItem>
               <DropdownMenuItem 
-                className="hover:bg-white/10 cursor-pointer text-red-400"
+                className="py-3 px-4 font-bold text-[15px] hover:bg-white/5 cursor-pointer"
                 onClick={logout}
               >
-                <LogOut className="w-4 h-4 mr-2" />
-                Sign out
+                Log out @{displayUser.username}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </aside>
+        </div>
+      </header>
 
-        {/* Main Content */}
-        <main className="flex-1 min-h-screen border-r border-white/10 max-w-[600px]">
-          {/* Header */}
-          <header className="sticky top-0 z-40 backdrop-blur-xl bg-black/80 border-b border-white/10">
-            <div className="px-4 py-3 flex items-center justify-between">
-              <div>
-                <h1 className="text-xl font-bold">Nexus</h1>
-                <p className="text-sm text-gray-500">AI-powered network search</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-white/20 hover:bg-white/10 rounded-full"
-                onClick={handleStartIndexing}
-                disabled={isIndexing}
-              >
-                {isIndexing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Indexing...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Refresh
-                  </>
-                )}
-              </Button>
-            </div>
-
-            {/* Indexing progress bar */}
-            <AnimatePresence>
-              {isIndexing && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="px-4 py-3 border-t border-white/10"
-                >
-                  <div className="flex items-center gap-4">
-                    <Zap className="w-4 h-4 text-[#1d9bf0] animate-pulse" />
-                    <div className="flex-1">
-                      <Progress value={indexProgress} className="h-1" />
-                    </div>
-                    <span className="text-sm font-mono text-[#1d9bf0]">
-                      {Math.round(indexProgress)}%
-                    </span>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </header>
-
-          {/* Search Section */}
-          <div className="p-4 border-b border-white/10">
-            <SearchBar onSearch={handleSearch} isLoading={isSearching} />
+      {/* Main Content */}
+      <main className="w-full max-w-[600px] border-x border-[#2f3336] min-h-screen relative">
+        {/* Header */}
+        <div className="sticky top-0 z-50 bg-black/65 backdrop-blur-md border-b border-[#2f3336]">
+          <div className="px-4 h-[53px] flex items-center justify-between">
+            <h1 className="text-xl font-bold">Nexus Search</h1>
+            <button className="p-2 hover:bg-white/10 rounded-full transition-colors">
+              <Settings className="w-5 h-5" />
+            </button>
           </div>
-
-          {/* Filters */}
-          {hasSearched && (
-            <motion.div
-              className="px-4 py-3 border-b border-white/10 flex items-center justify-between"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
+          
+          {/* Tabs */}
+          <div className="flex border-b border-[#2f3336]">
+            <button 
+              onClick={() => setActiveTab("for-you")}
+              className="flex-1 h-[53px] hover:bg-white/10 transition-colors relative flex items-center justify-center"
             >
-              <span className="text-sm text-gray-500">
-                {searchResults.length} results for &ldquo;{searchQuery}&rdquo;
+              <span className={`font-medium text-[15px] ${activeTab === "for-you" ? "font-bold text-[#e7e9ea]" : "text-[#71767b]"}`}>
+                For you
+                {activeTab === "for-you" && (
+                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[56px] h-[4px] bg-[#1d9bf0] rounded-full" />
+                )}
               </span>
+            </button>
+            <button 
+              onClick={() => setActiveTab("trending")}
+              className="flex-1 h-[53px] hover:bg-white/10 transition-colors relative flex items-center justify-center"
+            >
+              <span className={`font-medium text-[15px] ${activeTab === "trending" ? "font-bold text-[#e7e9ea]" : "text-[#71767b]"}`}>
+                Trending
+                {activeTab === "trending" && (
+                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[70px] h-[4px] bg-[#1d9bf0] rounded-full" />
+                )}
+              </span>
+            </button>
+          </div>
+        </div>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2 border-white/20 hover:bg-white/10 rounded-full">
-                    <Filter className="w-4 h-4" />
-                    Filter
-                    <Badge variant="secondary" className="ml-1 text-xs bg-[#1d9bf0]/20 text-[#1d9bf0]">
-                      {filters.degrees.length}
-                    </Badge>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 bg-black border-white/20">
-                  <DropdownMenuLabel className="text-gray-400">Connection Degree</DropdownMenuLabel>
-                  <DropdownMenuSeparator className="bg-white/10" />
-                  {[1, 2, 3].map((degree) => (
-                    <DropdownMenuCheckboxItem
-                      key={degree}
-                      checked={filters.degrees.includes(degree)}
-                      onCheckedChange={() => toggleDegreeFilter(degree)}
-                      className="hover:bg-white/10"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className={`w-3 h-3 rounded-full ${
-                          degree === 1 ? "bg-[#1d9bf0]" : degree === 2 ? "bg-[#00ba7c]" : "bg-[#f91880]"
-                        }`} />
-                        {degree === 1 ? "1st" : degree === 2 ? "2nd" : "3rd"} Degree
-                      </div>
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+        {/* Indexing Banner */}
+        <AnimatePresence>
+          {isIndexing && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="border-b border-[#2f3336] bg-[#1d9bf0]/10 overflow-hidden"
+            >
+              <div className="px-4 py-3">
+                <div className="flex items-center gap-3 mb-2">
+                  <Loader2 className="w-4 h-4 text-[#1d9bf0] animate-spin" />
+                  <span className="text-[13px] text-[#1d9bf0] font-bold">Indexing Network...</span>
+                </div>
+                <Progress value={indexProgress} className="h-1 bg-[#1d9bf0]/20" indicatorClassName="bg-[#1d9bf0]" />
+              </div>
             </motion.div>
           )}
+        </AnimatePresence>
 
-          {/* Results */}
-          <AnimatePresence mode="wait">
+        {/* Search Input Area */}
+        <div className="p-4 border-b border-[#2f3336]">
+          <SearchBar onSearch={handleSearch} isLoading={isSearching} />
+          
+          {!hasSearched && (
+            <div className="mt-4">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  "AI Founders",
+                  "VCs in SF",
+                  "Design Systems",
+                  "Crypto Devs",
+                  "Climate Tech",
+                ].map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => handleSearch(tag)}
+                    className="px-4 py-1.5 rounded-full border border-[#2f3336] text-[#1d9bf0] text-[14px] font-bold hover:bg-[#1d9bf0]/10 transition-colors"
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        {hasSearched ? (
+          <div className="pb-20">
             {isSearching ? (
-              <motion.div
-                key="loading"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex flex-col items-center justify-center py-20"
-              >
-                <div className="relative mb-4">
-                  <div className="w-12 h-12 rounded-full border-2 border-white/20 border-t-[#1d9bf0] animate-spin" />
-                  <Sparkles className="w-5 h-5 text-[#1d9bf0] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                </div>
-                <p className="text-gray-500">Searching your network with AI...</p>
-              </motion.div>
-            ) : hasSearched ? (
-              <motion.div
-                key="results"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="divide-y divide-white/10"
-              >
-                {searchResults.map((profile, index) => (
-                  <div key={profile.id} className="p-4 hover:bg-white/[0.02] transition-colors">
-                    <ProfileCard
-                      profile={profile}
-                      onGenerateIntro={handleGenerateIntro}
-                      index={index}
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-8 h-8 text-[#1d9bf0] animate-spin" />
+              </div>
+            ) : (
+              searchResults.map((profile, i) => (
+                <div key={profile.id} className="border-b border-[#2f3336] hover:bg-white/[0.03] transition-colors cursor-pointer">
+                  <div className="p-4">
+                    <ProfileCard 
+                      profile={profile} 
+                      onGenerateIntro={(p) => {
+                        setSelectedProfile(p);
+                        setIsIntroModalOpen(true);
+                      }} 
                     />
                   </div>
-                ))}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex flex-col items-center justify-center py-20 text-center px-8"
-              >
-                <div className="w-16 h-16 rounded-full bg-[#1d9bf0]/10 flex items-center justify-center mb-4">
-                  <Search className="w-7 h-7 text-[#1d9bf0]" />
                 </div>
-                <h3 className="text-xl font-bold mb-2">Search your network</h3>
-                <p className="text-gray-500 max-w-sm">
-                  Use natural language to find people. Try &ldquo;VCs investing in AI&rdquo; or &ldquo;Designers at startups&rdquo;.
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </main>
-
-        {/* Right Sidebar - Stats */}
-        <aside className="hidden xl:block w-[350px] h-screen sticky top-0 p-4">
-          <div className="space-y-4">
-            {/* Network stats */}
-            <div className="rounded-2xl bg-white/[0.02] border border-white/10 p-4">
-              <h3 className="font-bold mb-4">Your Network</h3>
-              <div className="space-y-3">
-                <StatRow
-                  icon={Users}
-                  label="Total Connections"
-                  value={mockStats.totalConnections.toLocaleString()}
-                  color="text-[#1d9bf0]"
-                />
-                <StatRow
-                  icon={MessageSquare}
-                  label="Tweets Indexed"
-                  value={mockStats.tweetsIndexed.toLocaleString()}
-                  color="text-[#00ba7c]"
-                />
-                <StatRow
-                  icon={Sparkles}
-                  label="Profiles Analyzed"
-                  value={mockStats.profilesAnalyzed.toLocaleString()}
-                  color="text-[#f91880]"
-                />
-                <StatRow
-                  icon={TrendingUp}
-                  label="Network Growth"
-                  value="+12%"
-                  color="text-[#ffd400]"
-                />
-              </div>
-            </div>
-
-            {/* Degree breakdown */}
-            <div className="rounded-2xl bg-white/[0.02] border border-white/10 p-4">
-              <h3 className="font-bold mb-4">Connection Degrees</h3>
-              <div className="space-y-3">
-                <DegreeBar
-                  label="1st Degree"
-                  value={mockStats.firstDegree}
-                  total={mockStats.totalConnections}
-                  color="bg-[#1d9bf0]"
-                />
-                <DegreeBar
-                  label="2nd Degree"
-                  value={mockStats.secondDegree}
-                  total={mockStats.totalConnections}
-                  color="bg-[#00ba7c]"
-                />
-                <DegreeBar
-                  label="3rd Degree"
-                  value={mockStats.thirdDegree}
-                  total={mockStats.totalConnections}
-                  color="bg-[#f91880]"
-                />
-              </div>
-            </div>
-
-            {/* Demo mode notice */}
-            {isDemo && (
-              <div className="rounded-2xl bg-[#1d9bf0]/10 border border-[#1d9bf0]/20 p-4">
-                <div className="flex items-center gap-2 text-[#1d9bf0] text-sm font-medium mb-2">
-                  <Zap className="w-4 h-4" />
-                  Demo Mode
-                </div>
-                <p className="text-sm text-gray-400">
-                  You&apos;re viewing sample data. Sign in with X to see your real network.
-                </p>
-              </div>
+              ))
             )}
           </div>
-        </aside>
-      </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
+            <div className="w-[300px]">
+              <h2 className="text-[31px] font-extrabold mb-2 leading-9">Find anyone in your network</h2>
+              <p className="text-[#71767b] text-[15px] mb-8">
+                Search for "Designers at Airbnb" or "Investors interested in AI" to unlock hidden connections.
+              </p>
+              <Button 
+                onClick={handleStartIndexing}
+                disabled={isIndexing}
+                className="bg-[#1d9bf0] hover:bg-[#1a8cd8] text-white font-bold rounded-full px-8 py-6 text-[17px]"
+              >
+                {isIndexing ? "Indexing..." : "Sync Network"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </main>
 
-      {/* Intro Modal */}
+      {/* Right Sidebar */}
+      <aside className="hidden lg:block w-[350px] pl-8 py-3 h-screen sticky top-0">
+        {/* Search Box */}
+        <div className="sticky top-0 bg-black pb-3 z-10">
+          <div className="group relative">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#71767b] group-focus-within:text-[#1d9bf0]">
+              <Search className="w-[18px] h-[18px]" />
+            </div>
+            <input
+              placeholder="Search"
+              className="w-full bg-[#202327] text-[#e7e9ea] placeholder:text-[#71767b] rounded-full py-2.5 pl-12 pr-4 outline-none border border-transparent focus:bg-black focus:border-[#1d9bf0]"
+            />
+          </div>
+        </div>
+
+        {/* Premium Box */}
+        <div className="bg-[#16181c] rounded-2xl p-4 mb-4 border border-transparent">
+          <h2 className="font-extrabold text-[20px] mb-2 leading-6">Subscribe to Premium</h2>
+          <p className="text-[15px] leading-5 text-[#e7e9ea] mb-3">
+            Subscribe to unlock new features and if eligible, receive a share of ads revenue.
+          </p>
+          <button className="bg-[#1d9bf0] hover:bg-[#1a8cd8] text-white font-bold rounded-full px-4 py-1.5 transition-colors">
+            Subscribe
+          </button>
+        </div>
+
+        {/* Trends */}
+        <div className="bg-[#16181c] rounded-2xl pt-3 mb-4 border border-transparent">
+          <h2 className="font-extrabold text-[20px] px-4 mb-3">Trends for you</h2>
+          {[
+            { category: "Technology · Trending", name: "#AI", posts: "500K posts" },
+            { category: "Business · Trending", name: "Nvidia", posts: "120K posts" },
+            { category: "Politics · Trending", name: "Election", posts: "2M posts" },
+          ].map((trend) => (
+            <div key={trend.name} className="px-4 py-3 hover:bg-white/[0.03] cursor-pointer transition-colors relative">
+              <div className="flex justify-between text-[#71767b] text-[13px]">
+                <span>{trend.category}</span>
+                <MoreHorizontal className="w-[18px] h-[18px] hover:text-[#1d9bf0] hover:bg-[#1d9bf0]/10 rounded-full" />
+              </div>
+              <div className="font-bold text-[15px] my-0.5">{trend.name}</div>
+              <div className="text-[#71767b] text-[13px]">{trend.posts}</div>
+            </div>
+          ))}
+          <div className="p-4 text-[#1d9bf0] text-[15px] hover:bg-white/[0.03] rounded-b-2xl cursor-pointer transition-colors">
+            Show more
+          </div>
+        </div>
+      </aside>
+
       <IntroModal
         isOpen={isIntroModalOpen}
         onClose={() => setIsIntroModalOpen(false)}
         profile={selectedProfile}
         currentUser={displayUser}
       />
-    </div>
-  );
-}
-
-// Stat Row Component
-function StatRow({
-  icon: Icon,
-  label,
-  value,
-  color,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  color: string;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <Icon className={`w-4 h-4 ${color}`} />
-        <span className="text-sm text-gray-400">{label}</span>
-      </div>
-      <span className="font-bold">{value}</span>
-    </div>
-  );
-}
-
-// Degree Bar Component
-function DegreeBar({
-  label,
-  value,
-  total,
-  color,
-}: {
-  label: string;
-  value: number;
-  total: number;
-  color: string;
-}) {
-  const percentage = (value / total) * 100;
-  
-  return (
-    <div>
-      <div className="flex items-center justify-between text-sm mb-1">
-        <span className="text-gray-400">{label}</span>
-        <span className="font-medium">{value.toLocaleString()}</span>
-      </div>
-      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-        <div
-          className={`h-full ${color} rounded-full transition-all duration-500`}
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
     </div>
   );
 }

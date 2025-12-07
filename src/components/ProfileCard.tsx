@@ -1,18 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { 
-  Users, 
   MessageSquare, 
-  ExternalLink,
-  Sparkles,
-  Quote,
   MoreHorizontal,
+  Sparkles,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 
 export interface Profile {
   id: string;
@@ -32,7 +26,6 @@ export interface Profile {
 interface ProfileCardProps {
   profile: Profile;
   onGenerateIntro: (profile: Profile) => void;
-  index?: number;
 }
 
 function formatCount(count: number): string {
@@ -45,161 +38,94 @@ function formatCount(count: number): string {
   return count.toString();
 }
 
-// X Logo SVG Component
-function XLogo({ className = "w-4 h-4" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
-  );
-}
-
-export function ProfileCard({ profile, onGenerateIntro, index = 0 }: ProfileCardProps) {
-  const [isHovered, setIsHovered] = useState(false);
-
-  const degreeConfig = {
-    1: { 
-      label: "1st", 
-      bgColor: "bg-[#1d9bf0]",
-      textColor: "text-[#1d9bf0]",
-      description: "Direct connection"
-    },
-    2: { 
-      label: "2nd", 
-      bgColor: "bg-[#00ba7c]",
-      textColor: "text-[#00ba7c]",
-      description: "Friend of friend"
-    },
-    3: { 
-      label: "3rd", 
-      bgColor: "bg-[#f91880]",
-      textColor: "text-[#f91880]",
-      description: "Extended network"
-    },
-  };
-
-  const degree = degreeConfig[profile.degree];
+export function ProfileCard({ profile, onGenerateIntro }: ProfileCardProps) {
+  const [isFollowing, setIsFollowing] = useState(false);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: index * 0.05 }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className="w-full"
-    >
-      <div className="flex gap-3">
-        {/* Avatar */}
-        <div className="flex-shrink-0">
-          <Avatar className="w-12 h-12">
-            <AvatarImage src={profile.profile_image_url} alt={profile.name} />
-            <AvatarFallback className="bg-gray-800 text-white font-bold">
-              {profile.name.slice(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-        </div>
+    <div className="flex gap-3">
+      {/* Avatar */}
+      <div className="flex-shrink-0">
+        <Avatar className="w-10 h-10 hover:opacity-90 cursor-pointer transition-opacity">
+          <AvatarImage src={profile.profile_image_url} alt={profile.name} />
+          <AvatarFallback className="bg-[#333] text-white font-bold">
+            {profile.name.slice(0, 2).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+      </div>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="font-bold hover:underline cursor-pointer truncate">
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        {/* Header */}
+        <div className="flex justify-between items-start">
+          <div className="group cursor-pointer">
+            <div className="flex items-center gap-1">
+              <span className="font-bold text-[15px] text-[#e7e9ea] group-hover:underline truncate">
                 {profile.name}
               </span>
-              <span className="text-gray-500 truncate">@{profile.username}</span>
-              <span className="text-gray-500">·</span>
-              <Badge 
-                variant="secondary" 
-                className={`${degree.bgColor} text-white text-xs font-bold px-2 py-0`}
-              >
-                {degree.label}
-              </Badge>
-            </div>
-            <button className="p-2 -m-2 rounded-full hover:bg-[#1d9bf0]/10 text-gray-500 hover:text-[#1d9bf0] transition-colors">
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Bio */}
-          <p className="text-[15px] leading-normal mt-1 text-gray-100">
-            {profile.bio || "No bio available"}
-          </p>
-
-          {/* Match reason */}
-          {profile.matchReason && (
-            <div className="mt-2 flex items-start gap-2 text-sm">
-              <Sparkles className={`w-4 h-4 ${degree.textColor} mt-0.5 flex-shrink-0`} />
-              <span className="text-gray-400">
-                <span className={`${degree.textColor} font-medium`}>Match: </span>
-                {profile.matchReason}
-              </span>
-            </div>
-          )}
-
-          {/* Relevant tweet */}
-          {profile.relevantTweet && (
-            <div className="mt-2 p-3 rounded-xl bg-white/[0.02] border border-white/10">
-              <div className="flex items-start gap-2 text-sm">
-                <Quote className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
-                <p className="text-gray-300 italic line-clamp-2">
-                  &ldquo;{profile.relevantTweet}&rdquo;
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Topics */}
-          {profile.topics && profile.topics.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-3">
-              {profile.topics.slice(0, 4).map((topic) => (
-                <span
-                  key={topic}
-                  className="text-xs px-2 py-1 rounded-full bg-white/5 text-gray-400 hover:bg-[#1d9bf0]/10 hover:text-[#1d9bf0] transition-colors cursor-pointer"
-                >
-                  {topic}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Stats & Actions */}
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
-            <div className="flex items-center gap-4 text-sm text-gray-500">
-              <div className="flex items-center gap-1">
-                <Users className="w-4 h-4" />
-                <span><strong className="text-white">{formatCount(profile.followers_count)}</strong> followers</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                onClick={() => onGenerateIntro(profile)}
-                className="bg-white text-black font-bold rounded-full hover:bg-white/90 transition-colors"
-              >
-                <MessageSquare className="w-4 h-4 mr-1.5" />
-                Intro
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-white/20 hover:bg-white/10 rounded-full"
-                asChild
-              >
-                <a
-                  href={`https://x.com/${profile.username}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <XLogo className="w-4 h-4" />
-                </a>
-              </Button>
+              {/* Verified Badge (optional) */}
+              {/* <svg viewBox="0 0 24 24" aria-label="Verified account" className="w-[18px] h-[18px] text-[#1d9bf0] fill-current"><g><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.818-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.437 2.25c-.415-.165-.866-.25-1.336-.25-2.11 0-3.818 1.79-3.818 4 0 .495.083.965.238 1.4-1.272.65-2.147 2.018-2.147 3.6 0 1.495.782 2.798 1.942 3.486-.02.17-.032.34-.032.514 0 2.21 1.708 4 3.818 4 .47 0 .92-.086 1.335-.25.62 1.334 1.926 2.25 3.437 2.25 1.512 0 2.818-.916 3.437-2.25.415.163.865.248 1.336.248 2.11 0 3.818-1.79 3.818-4 0-.174-.012-.344-.033-.513 1.158-.687 1.943-1.99 1.943-3.484zm-6.616-3.334l-4.334 6.5c-.145.217-.382.334-.625.334-.143 0-.288-.04-.416-.126l-.115-.094-2.415-2.415c-.293-.293-.293-.768 0-1.06s.768-.294 1.06 0l1.77 1.767 3.825-5.74c.23-.345.696-.436 1.04-.207.346.23.44.696.21 1.04z" /></g></svg> */}
+              <span className="text-[#71767b] text-[15px] truncate">@{profile.username}</span>
+              <span className="text-[#71767b] text-[15px] px-1">·</span>
+              <span className="text-[#71767b] text-[15px] hover:underline">2h</span>
             </div>
           </div>
+          <button className="text-[#71767b] hover:text-[#1d9bf0] hover:bg-[#1d9bf0]/10 p-2 -mr-2 rounded-full transition-colors">
+            <MoreHorizontal className="w-[18px] h-[18px]" />
+          </button>
+        </div>
+
+        {/* Bio / Content */}
+        <div className="mt-0.5 text-[15px] text-[#e7e9ea] whitespace-pre-wrap leading-5">
+          {profile.bio}
+        </div>
+
+        {/* Nexus Insight (Match Reason) */}
+        {profile.matchReason && (
+          <div className="mt-3 flex items-center gap-2 text-[13px] text-[#71767b]">
+            <Sparkles className="w-4 h-4 text-[#1d9bf0]" />
+            <span className="font-medium text-[#1d9bf0]">Nexus Insight:</span>
+            <span>{profile.matchReason}</span>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex justify-between mt-3 max-w-[425px]">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onGenerateIntro(profile);
+            }}
+            className="group flex items-center gap-2 text-[#71767b] hover:text-[#1d9bf0] transition-colors"
+          >
+            <div className="p-2 rounded-full group-hover:bg-[#1d9bf0]/10 transition-colors -ml-2">
+              <MessageSquare className="w-[18px] h-[18px]" />
+            </div>
+            <span className="text-[13px] group-hover:text-[#1d9bf0]">Intro</span>
+          </button>
+
+          {/* Follow Button (Right aligned) */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsFollowing(!isFollowing);
+            }}
+            className={`
+              h-[32px] px-4 rounded-full font-bold text-[14px] transition-colors border
+              ${isFollowing 
+                ? "bg-transparent text-[#e7e9ea] border-[#536471] hover:border-[#f4212e] hover:text-[#f4212e] hover:bg-[#f4212e]/10 group" 
+                : "bg-[#eff3f4] text-[#0f1419] border-transparent hover:bg-[#d7dbdc]"
+              }
+            `}
+          >
+            {isFollowing ? (
+              <span className="group-hover:hidden">Following</span>
+            ) : (
+              "Follow"
+            )}
+            {isFollowing && <span className="hidden group-hover:block">Unfollow</span>}
+          </button>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

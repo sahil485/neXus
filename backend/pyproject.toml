@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "nexus-servers"
+version = "0.1.0"
+description = "neXus servers workspace"
+authors = ["Your Name <you@example.com>"]
+packages = [{include = "nexus"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.32.0"}
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+
+[tool.poetry.scripts]
+nexus = "nexus.main:start"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
