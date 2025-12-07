@@ -127,7 +127,7 @@ export function IntroModal({
       <DialogContent className="sm:max-w-lg bg-black border-white/20 p-0 overflow-hidden" showCloseButton={false}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-          <span className="font-bold">New Message</span>
+          <DialogTitle className="font-bold text-base">New Message</DialogTitle>
           <button
             onClick={onClose}
             className="p-2 -mr-2 rounded-full hover:bg-white/10 transition-colors"
