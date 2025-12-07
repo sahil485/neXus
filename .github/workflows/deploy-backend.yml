@@ -67,7 +67,17 @@ jobs:
       - name: Deploy to prod
         run: |
           cd cdk
-          npm run cdk deploy nexus-backend-prod --require-approval never --progress events
+          npx cdk deploy nexus-backend-prod --require-approval never --progress events
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+          ENVIRONMENT: prod
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ env.SUPABASE_KEY }}
+          TWITTER_CLIENT_ID: ${{ env.TWITTER_CLIENT_ID }}
+          TWITTER_CLIENT_SECRET: ${{ env.TWITTER_CLIENT_SECRET }}
+          OPENAI_API_KEY: ${{ env.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ env.ANTHROPIC_API_KEY }}
 
       - name: Deployment Summary
         run: |
