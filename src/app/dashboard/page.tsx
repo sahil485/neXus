@@ -145,23 +145,36 @@ export default function DashboardPage() {
     setIndexProgress(10);
 
     try {
-      // Call the Python backend endpoint
-      const response = await fetch(`/api/py/api/following/${user.username}`, {
+      // Trigger background scraping job via Inngest
+      const response = await fetch("/api/scrape", {
         method: "POST",
       });
       
       if (!response.ok) {
-        throw new Error("Indexing failed");
+        throw new Error("Failed to start indexing");
       }
       
       const data = await response.json();
-      console.log("Indexing complete:", data);
-      setIndexProgress(100);
+      console.log("Scraping job started:", data);
       
-      // Keep "100%" visible for a moment
+      // Simulate progress since actual scraping is in background
+      const progressInterval = setInterval(() => {
+        setIndexProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90; // Keep at 90% until we add status polling
+          }
+          return prev + 10;
+        });
+      }, 500);
+      
+      // For now, complete after 5 seconds
+      // TODO: Add polling to check actual job status
       setTimeout(() => {
-        setIsIndexing(false);
-      }, 2000);
+        clearInterval(progressInterval);
+        setIndexProgress(100);
+        setTimeout(() => setIsIndexing(false), 2000);
+      }, 5000);
       
     } catch (error) {
       console.error("Indexing error:", error);
