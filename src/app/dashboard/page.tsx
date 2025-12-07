@@ -137,18 +137,36 @@ export default function DashboardPage() {
   };
 
   const handleStartIndexing = async () => {
+    if (!user?.username) return;
     setIsIndexing(true);
     setIndexProgress(0);
-    const interval = setInterval(() => {
-      setIndexProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsIndexing(false);
-          return 100;
-        }
-        return prev + 10;
+    
+    // Simulate initial progress to show responsiveness
+    setIndexProgress(10);
+
+    try {
+      // Call the Python backend endpoint
+      const response = await fetch(`/api/py/api/following/${user.username}`, {
+        method: "POST",
       });
-    }, 200);
+      
+      if (!response.ok) {
+        throw new Error("Indexing failed");
+      }
+      
+      const data = await response.json();
+      console.log("Indexing complete:", data);
+      setIndexProgress(100);
+      
+      // Keep "100%" visible for a moment
+      setTimeout(() => {
+        setIsIndexing(false);
+      }, 2000);
+      
+    } catch (error) {
+      console.error("Indexing error:", error);
+      setIsIndexing(false);
+    }
   };
 
   if (authLoading) {
