@@ -61,12 +61,12 @@ jobs:
 
       - name: Install CDK dependencies
         run: |
-          cd cdk
+          cd backend/cdk
           npm install
 
       - name: Bootstrap CDK (if needed)
         run: |
-          cd cdk
+          cd backend/cdk
           npx cdk bootstrap aws://${{ env.AWS_ACCOUNT_ID }}/us-east-1 || true
         env:
           VERSION: ${{ steps.get_version.outputs.version }}
@@ -81,7 +81,7 @@ jobs:
 
       - name: Deploy to prod
         run: |
-          cd cdk
+          cd backend/cdk
           npx cdk deploy nexus-backend-prod --require-approval never --progress events
         env:
           VERSION: ${{ steps.get_version.outputs.version }}

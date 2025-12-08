@@ -1,9 +1,20 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+../bfg-report/
+# Python
 venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/.env
+backend/.env*.local
 
-# dependencies
+# Node.js
 /node_modules
+/frontend/node_modules
+/backend/cdk/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -12,41 +23,54 @@ venv/
 !.yarn/releases
 !.yarn/versions
 
-# testing
+# Testing
 /coverage
+*.log
 
-# next.js
+# Next.js
 /.next/
 /out/
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts
 
-# production
+# Build outputs
 /build
+*.tsbuildinfo
+dist/
 
-# misc
+# Misc
 .DS_Store
 *.pem
+Consumer Key
 
-# debug
+# Debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# vercel
+# Vercel
 .vercel
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-Consumer Key
-
-__pycache__/
-*.py[cod]
-*$py.class
-# env files
+# Environment files
 .env
 .env*.local
 .env.development
 .env.test
 .env.production
 backend/.env
+frontend/.env
+frontend/.env*.local
+
+# CDK
+backend/cdk/cdk.out/
+*.tar
+
+# BFG Repo Cleaner
+.bfg-report/
+
+# IDE
+.claude/
+.vscode/
+.idea/
