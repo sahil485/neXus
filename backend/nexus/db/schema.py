@@ -57,7 +57,7 @@ class XConnection(Base):
     """Twitter's follow graph - stores mutual connections as array"""
     __tablename__ = "x_connections"
 
-    x_user_id: Mapped[str] = mapped_column(String(50), ForeignKey("x_profiles.x_user_id"), primary_key=True)
+    x_user_id: Mapped[str] = mapped_column(String(50), ForeignKey("x_profiles.x_user_id"), primary_key=True, index=True)
     mutual_ids: Mapped[List[str]] = mapped_column(ARRAY(String(50)), default=list)
     discovered_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
@@ -68,6 +68,6 @@ class XPosts(Base):
     """Simplified posts storage - just the text content as array"""
     __tablename__ = "x_posts"
 
-    x_user_id: Mapped[str] = mapped_column(String(50), ForeignKey("x_profiles.x_user_id"), primary_key=True)
+    x_user_id: Mapped[str] = mapped_column(String(50), ForeignKey("x_profiles.x_user_id"), primary_key=True, index=True)
     posts: Mapped[List[str]] = mapped_column(ARRAY(Text), default=list)
     discovered_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
