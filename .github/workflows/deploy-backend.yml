@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy-prod:
-    # if: contains(github.ref, 'refs/tags/')
+    if: contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     environment: Production
     env:
