@@ -1,11 +1,9 @@
 name: Deploy Nexus Backend
 
 on:
-  pull_request:
-    branches:
-      - main
-    # tags:
-    #   - "backend@*"
+  push:
+    tags:
+      - "backend@*"
 
 jobs:
   deploy-prod:
