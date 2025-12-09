@@ -67,6 +67,7 @@ export function IntroModal({
   useEffect(() => {
     if (bridgeProfiles.length > 0) {
       setSelectedBridgeProfile(bridgeProfiles[0]);
+      setMessageType("mutual");
     } else {
       setSelectedBridgeProfile(undefined);
     }
