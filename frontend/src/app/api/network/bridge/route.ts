@@ -31,32 +31,33 @@ export async function GET(request: NextRequest) {
     });
 
     if (!response.ok) {
-      console.error("Backend bridge API failed:", response.status);
-      return NextResponse.json({ bridge: null });
+      const errorText = await response.text();
+      console.error("Backend bridge API failed:", response.status, errorText);
+      return NextResponse.json({ bridges: [] });
     }
 
     const data = await response.json();
 
-    if (!data.bridge) {
-      return NextResponse.json({ bridge: null });
+    if (!data.bridges || data.bridges.length === 0) {
+      return NextResponse.json({ bridges: [] });
     }
 
-    // Return the bridge profile
-    return NextResponse.json({
-      bridge: {
-        id: data.bridge.x_user_id,
-        x_user_id: data.bridge.x_user_id,
-        username: data.bridge.username,
-        name: data.bridge.name,
-        bio: data.bridge.bio || "",
-        profile_image_url: data.bridge.profile_image_url,
-        followers_count: data.bridge.followers_count || 0,
-        following_count: data.bridge.following_count || 0,
-        degree: 1,
-      }
-    });
+    // Return all bridge profiles
+    const bridges = data.bridges.map((bridge: any) => ({
+      id: bridge.x_user_id,
+      x_user_id: bridge.x_user_id,
+      username: bridge.username,
+      name: bridge.name,
+      bio: bridge.bio || "",
+      profile_image_url: bridge.profile_image_url,
+      followers_count: bridge.followers_count || 0,
+      following_count: bridge.following_count || 0,
+      degree: 1,
+    }));
+
+    return NextResponse.json({ bridges });
   } catch (error) {
     console.error("Bridge profile fetch error:", error);
-    return NextResponse.json({ bridge: null });
+    return NextResponse.json({ bridges: [] });
   }
 }

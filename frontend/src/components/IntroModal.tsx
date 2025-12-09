@@ -29,7 +29,7 @@ interface IntroModalProps {
   isOpen: boolean;
   onClose: () => void;
   profile: Profile | null;
-  bridgeProfile?: Profile;
+  bridgeProfiles?: Profile[];
   currentUser?: {
     name: string;
     username: string;
@@ -45,7 +45,7 @@ export function IntroModal({
   isOpen,
   onClose,
   profile,
-  bridgeProfile,
+  bridgeProfiles = [],
   currentUser,
   onRegenerate,
   isLoading = false,
@@ -55,10 +55,22 @@ export function IntroModal({
   const [copied, setCopied] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedBridgeProfile, setSelectedBridgeProfile] = useState<Profile | undefined>(
+    bridgeProfiles.length > 0 ? bridgeProfiles[0] : undefined
+  );
   const [messageType, setMessageType] = useState<"direct" | "mutual">(
-    profile?.degree === 2 && bridgeProfile ? "mutual" : "direct"
+    profile?.degree === 2 && bridgeProfiles.length > 0 ? "mutual" : "direct"
   );
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Update selected bridge when bridgeProfiles changes
+  useEffect(() => {
+    if (bridgeProfiles.length > 0) {
+      setSelectedBridgeProfile(bridgeProfiles[0]);
+    } else {
+      setSelectedBridgeProfile(undefined);
+    }
+  }, [bridgeProfiles]);
 
   // Generate intro with Grok when modal opens
   const generateIntro = async () => {
@@ -71,9 +83,9 @@ export function IntroModal({
     }
 
     // For "Use Mutual", use the simple template message - no AI call needed
-    if (messageType === "mutual" && bridgeProfile) {
+    if (messageType === "mutual" && selectedBridgeProfile) {
       setIsGenerating(false);
-      setMessage(generateSampleIntro(profile, currentUser, bridgeProfile));
+      setMessage(generateSampleIntro(profile, currentUser, selectedBridgeProfile));
       return;
     }
 
@@ -135,7 +147,7 @@ export function IntroModal({
         abortControllerRef.current = null;
       }
     };
-  }, [isOpen, profile, messageType]);
+  }, [isOpen, profile, messageType, selectedBridgeProfile]);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message);
@@ -149,7 +161,7 @@ export function IntroModal({
   };
 
   const handleOpenDM = () => {
-    const targetProfile = messageType === "mutual" && bridgeProfile ? bridgeProfile : profile;
+    const targetProfile = messageType === "mutual" && selectedBridgeProfile ? selectedBridgeProfile : profile;
     if (targetProfile) {
       window.open(
         `https://twitter.com/messages/compose?recipient_id=${targetProfile.x_user_id}&text=${encodeURIComponent(message)}`,
@@ -188,7 +200,7 @@ export function IntroModal({
 
         <div className="px-4 pt-2 pb-4 space-y-4">
           {/* Message type selector for 2nd degree connections */}
-          {profile.degree === 2 && bridgeProfile && (
+          {profile.degree === 2 && bridgeProfiles.length > 0 && (
             <div className="flex gap-2 p-1 bg-[#16181c] rounded-lg">
               <button
                 onClick={() => setMessageType("mutual")}
@@ -238,21 +250,48 @@ export function IntroModal({
             </div>
 
             {/* Bridge profile (via) with bracket connector */}
-            {messageType === "mutual" && bridgeProfile && (
+            {messageType === "mutual" && selectedBridgeProfile && bridgeProfiles.length > 0 && (
               <div className="relative flex items-center gap-3 pl-8">
                 {/* 90 degree bracket connector */}
                 <div className="absolute left-0 top-[-12px] bottom-[calc(50%)] w-6 border-l-2 border-b-2 border-[#1d9bf0] rounded-bl-lg"></div>
 
                 <span className="text-xs text-gray-500 font-medium">via</span>
+
                 <Avatar className="w-10 h-10">
-                  <AvatarImage src={bridgeProfile.profile_image_url} alt={bridgeProfile.name} />
+                  <AvatarImage src={selectedBridgeProfile.profile_image_url} alt={selectedBridgeProfile.name} />
                   <AvatarFallback className="bg-gray-800 text-white font-bold">
-                    {bridgeProfile.name.slice(0, 2).toUpperCase()}
+                    {selectedBridgeProfile.name.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
+
                 <div className="flex-1 min-w-0">
-                  <div className="font-bold text-sm truncate text-[#1d9bf0]">{bridgeProfile.name}</div>
-                  <div className="text-xs text-gray-500">@{bridgeProfile.username}</div>
+                  {bridgeProfiles.length > 1 ? (
+                    <select
+                      value={selectedBridgeProfile.x_user_id}
+                      onChange={(e) => {
+                        const selected = bridgeProfiles.find(b => b.x_user_id === e.target.value);
+                        if (selected) {
+                          setSelectedBridgeProfile(selected);
+                        }
+                      }}
+                      className="font-bold text-sm text-[#1d9bf0] bg-transparent border-none outline-none cursor-pointer hover:underline appearance-none pr-4"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231d9bf0' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right center',
+                        backgroundSize: '12px',
+                      }}
+                    >
+                      {bridgeProfiles.map((bridge) => (
+                        <option key={bridge.x_user_id} value={bridge.x_user_id} className="bg-[#16181c] text-[#e7e9ea]">
+                          {bridge.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="font-bold text-sm truncate text-[#1d9bf0]">{selectedBridgeProfile.name}</div>
+                  )}
+                  <div className="text-xs text-gray-500">@{selectedBridgeProfile.username}</div>
                 </div>
               </div>
             )}

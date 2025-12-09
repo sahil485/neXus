@@ -42,7 +42,7 @@ export default function DashboardPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [skeletonCount, setSkeletonCount] = useState(0);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
-  const [bridgeProfile, setBridgeProfile] = useState<Profile | null>(null);
+  const [bridgeProfiles, setBridgeProfiles] = useState<Profile[]>([]);
   const [isIntroModalOpen, setIsIntroModalOpen] = useState(false);
   const [isIndexing, setIsIndexing] = useState(false);
   const [indexProgress, setIndexProgress] = useState(0);
@@ -297,11 +297,11 @@ export default function DashboardPage() {
                             console.log('Profile clicked:', p);
                             console.log('Profile degree:', p.degree);
 
-                            let fetchedBridge = null;
+                            let fetchedBridges: Profile[] = [];
 
-                            // For 2nd degree connections, fetch a bridge profile from the database FIRST
+                            // For 2nd degree connections, fetch bridge profiles from the database FIRST
                             if (p.degree === 2) {
-                              console.log('Fetching bridge profile for 2nd degree connection...');
+                              console.log('Fetching bridge profiles for 2nd degree connection...');
                               try {
                                 const url = `/api/network/bridge?target=${p.x_user_id}`;
                                 console.log('Fetching from:', url);
@@ -309,15 +309,15 @@ export default function DashboardPage() {
                                 console.log('Bridge API response status:', response.status);
                                 if (response.ok) {
                                   const data = await response.json();
-                                  console.log('Bridge profile data:', data);
-                                  fetchedBridge = data.bridge || null;
-                                  console.log('Fetched bridge profile:', fetchedBridge);
+                                  console.log('Bridge profiles data:', data);
+                                  fetchedBridges = data.bridges || [];
+                                  console.log(`Fetched ${fetchedBridges.length} bridge profiles`);
                                 } else {
                                   const errorText = await response.text();
-                                  console.error('Failed to fetch bridge profile:', response.status, errorText);
+                                  console.error('Failed to fetch bridge profiles:', response.status, errorText);
                                 }
                               } catch (error) {
-                                console.error("Bridge profile fetch error:", error);
+                                console.error("Bridge profiles fetch error:", error);
                               }
                             } else {
                               console.log('1st degree connection, no bridge needed');
@@ -325,8 +325,8 @@ export default function DashboardPage() {
 
                             // THEN set states and open modal
                             setSelectedProfile(p);
-                            setBridgeProfile(fetchedBridge);
-                            console.log('Opening modal with bridge:', fetchedBridge);
+                            setBridgeProfiles(fetchedBridges);
+                            console.log('Opening modal with bridges:', fetchedBridges);
                             setIsIntroModalOpen(true);
                           }}
                         />
@@ -387,10 +387,10 @@ export default function DashboardPage() {
         onClose={() => {
           setIsIntroModalOpen(false);
           setSelectedProfile(null);
-          setBridgeProfile(null);
+          setBridgeProfiles([]);
         }}
         profile={selectedProfile}
-        bridgeProfile={bridgeProfile || undefined}
+        bridgeProfiles={bridgeProfiles}
         currentUser={displayUser}
       />
     </div>

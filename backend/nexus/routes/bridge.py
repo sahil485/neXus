@@ -33,12 +33,14 @@ async def get_bridge_profile(
 
         if not current_user_connection or not current_user_connection.mutual_ids:
             print(f"No mutuals found for current user {current_user_id}")
-            return {"bridge": None}
+            return {"bridges": []}
 
         current_mutuals = set(current_user_connection.mutual_ids)
         print(f"Current user has {len(current_mutuals)} mutuals")
 
-        # Check each of the current user's mutuals to see if they also know the target
+        # Find all mutual connections that connect both users
+        bridge_profiles = []
+
         for potential_bridge_id in current_mutuals:
             # Get this potential bridge's connections
             bridge_conn_result = await db.execute(
@@ -57,23 +59,21 @@ async def get_bridge_profile(
                     bridge_profile = profile_result.scalar_one_or_none()
 
                     if bridge_profile:
-                        return {
-                            "bridge": {
-                                "x_user_id": bridge_profile.x_user_id,
-                                "username": bridge_profile.username,
-                                "name": bridge_profile.name,
-                                "bio": bridge_profile.bio or "",
-                                "profile_image_url": bridge_profile.profile_image_url,
-                                "followers_count": bridge_profile.followers_count or 0,
-                                "following_count": bridge_profile.following_count or 0,
-                            }
-                        }
+                        bridge_profiles.append({
+                            "x_user_id": bridge_profile.x_user_id,
+                            "username": bridge_profile.username,
+                            "name": bridge_profile.name,
+                            "bio": bridge_profile.bio or "",
+                            "profile_image_url": bridge_profile.profile_image_url,
+                            "followers_count": bridge_profile.followers_count or 0,
+                            "following_count": bridge_profile.following_count or 0,
+                        })
 
-        print(f"No bridge found between {current_user_id} and {target_user_id}")
-        return {"bridge": None}
+        print(f"Found {len(bridge_profiles)} bridges between {current_user_id} and {target_user_id}")
+        return {"bridges": bridge_profiles}
 
     except Exception as e:
         print(f"Error finding bridge profile: {e}")
         import traceback
         traceback.print_exc()
-        return {"bridge": None}
+        return {"bridges": []}

@@ -61,6 +61,7 @@ export default function NetworkPage() {
   const [viewMode, setViewMode] = useState<"list" | "graph">("graph");
   const [selectedProfile, setSelectedProfile] = useState<NetworkProfile | null>(null);
   const [bridgeProfile, setBridgeProfile] = useState<NetworkProfile | null>(null);
+  const [bridgeProfiles, setBridgeProfiles] = useState<Profile[]>([]);
   const [topicMode, setTopicMode] = useState(false);
   const [topicData, setTopicData] = useState<{ user_id: string; topic: string; topic_confidence: number }[]>([]);
   const [topicColors, setTopicColors] = useState<{ [key: string]: string }>({});
@@ -467,7 +468,35 @@ export default function NetworkPage() {
 
                   <div className="space-y-3">
                     <button
-                      onClick={() => {
+                      onClick={async () => {
+                        console.log('Generate Intro clicked for:', selectedProfile);
+
+                        let fetchedBridges: Profile[] = [];
+
+                        // For 2nd degree connections, fetch bridge profiles from the database
+                        if (selectedProfile.degree === 2) {
+                          console.log('Fetching bridge profiles for 2nd degree connection...');
+                          try {
+                            const url = `/api/network/bridge?target=${selectedProfile.x_user_id}`;
+                            console.log('Fetching from:', url);
+                            const response = await fetch(url);
+                            console.log('Bridge API response status:', response.status);
+                            if (response.ok) {
+                              const data = await response.json();
+                              console.log('Bridge profiles data:', data);
+                              fetchedBridges = data.bridges || [];
+                              console.log(`Fetched ${fetchedBridges.length} bridge profiles`);
+                            } else {
+                              const errorText = await response.text();
+                              console.error('Failed to fetch bridge profiles:', response.status, errorText);
+                            }
+                          } catch (error) {
+                            console.error("Bridge profiles fetch error:", error);
+                          }
+                        } else {
+                          console.log('1st degree connection, no bridge needed');
+                        }
+
                         setProfileForIntro({
                           id: selectedProfile.x_user_id,
                           x_user_id: selectedProfile.x_user_id,
@@ -482,6 +511,8 @@ export default function NetworkPage() {
                           aiReason: undefined,
                           verifying: false,
                         });
+                        setBridgeProfiles(fetchedBridges);
+                        console.log('Opening modal with bridges:', fetchedBridges);
                         setIsIntroModalOpen(true);
                       }}
                       className="flex items-center justify-center gap-2 w-full bg-[#1d9bf0] hover:bg-[#1a8cd8] font-bold h-[40px] rounded-full transition-colors text-white shadow-lg"
@@ -513,22 +544,11 @@ export default function NetworkPage() {
           onClose={() => {
             setIsIntroModalOpen(false);
             setProfileForIntro(null);
+            setBridgeProfiles([]);
           }}
           profile={profileForIntro}
-          bridgeProfile={bridgeProfile ? {
-            id: bridgeProfile.x_user_id,
-            x_user_id: bridgeProfile.x_user_id,
-            username: bridgeProfile.username,
-            name: bridgeProfile.name,
-            bio: bridgeProfile.bio,
-            profile_image_url: bridgeProfile.profile_image_url,
-            followers_count: bridgeProfile.followers_count,
-            following_count: bridgeProfile.following_count,
-            degree: bridgeProfile.degree,
-            matchLevel: "Good",
-            aiReason: undefined,
-            verifying: false,
-          } : undefined}
+          bridgeProfiles={bridgeProfiles}
+          currentUser={displayUser}
         />
       )}
     </div>
