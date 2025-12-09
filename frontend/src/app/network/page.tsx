@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/components/AuthProvider";
 import { useRouter } from "next/navigation";
 import GraphVisualization from "@/components/GraphVisualization";
-import { XLogo } from "@/components/ui/logos";
+import { GrokLogo, XLogo } from "@/components/ui/logos";
 import { IntroModal } from "@/components/IntroModal";
 import type { Profile } from "@/components/ProfileCard";
 
@@ -427,7 +427,7 @@ export default function NetworkPage() {
                 {selectedProfile.degree === 2 && bridgeProfile && (
                   <div className="bg-[#1d9bf0]/10 border border-[#1d9bf0]/20 rounded-xl p-4">
                     <h4 className="text-[#1d9bf0] font-bold text-sm mb-2 flex items-center gap-2">
-                      <Sparkles className="w-4 h-4" />
+                      <GrokLogo className="w-4 h-4" />
                       Introduction Path
                     </h4>
                     <p className="text-[14px] leading-relaxed">
