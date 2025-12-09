@@ -157,13 +157,13 @@ async def create_or_update_user(
         await db.execute(profile_stmt)
         await db.commit()
 
-        # Schedule appropriate background scraping based on user status
-        if is_new_user:
-            logger.info(f"📅 Scheduling full scraping for NEW user {user.username}")
-            background_tasks.add_task(_background_scrape_new_user, x_user_id)
-        else:
-            logger.info(f"📅 Scheduling posts scraping for EXISTING user {user.username}")
-            background_tasks.add_task(_background_scrape_existing_user, x_user_id)
+        # # Schedule appropriate background scraping based on user status
+        # if is_new_user:
+        #     logger.info(f"📅 Scheduling full scraping for NEW user {user.username}")
+        #     background_tasks.add_task(_background_scrape_new_user, x_user_id)
+        # else:
+        #     logger.info(f"📅 Scheduling posts scraping for EXISTING user {user.username}")
+        #     background_tasks.add_task(_background_scrape_existing_user, x_user_id)
 
         return {
             "success": True,
