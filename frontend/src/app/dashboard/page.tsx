@@ -42,6 +42,7 @@ export default function DashboardPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [skeletonCount, setSkeletonCount] = useState(0);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
+  const [bridgeProfile, setBridgeProfile] = useState<Profile | null>(null);
   const [isIntroModalOpen, setIsIntroModalOpen] = useState(false);
   const [isIndexing, setIsIndexing] = useState(false);
   const [indexProgress, setIndexProgress] = useState(0);
@@ -290,12 +291,44 @@ export default function DashboardPage() {
                       className="border-b border-[#2f3336] hover:bg-white/[0.03] transition-colors cursor-pointer"
                     >
                       <div className="p-4">
-                        <ProfileCard 
-                          profile={profile} 
-                          onGenerateIntro={(p) => {
+                        <ProfileCard
+                          profile={profile}
+                          onGenerateIntro={async (p) => {
+                            console.log('Profile clicked:', p);
+                            console.log('Profile degree:', p.degree);
+
+                            let fetchedBridge = null;
+
+                            // For 2nd degree connections, fetch a bridge profile from the database FIRST
+                            if (p.degree === 2) {
+                              console.log('Fetching bridge profile for 2nd degree connection...');
+                              try {
+                                const url = `/api/network/bridge?target=${p.x_user_id}`;
+                                console.log('Fetching from:', url);
+                                const response = await fetch(url);
+                                console.log('Bridge API response status:', response.status);
+                                if (response.ok) {
+                                  const data = await response.json();
+                                  console.log('Bridge profile data:', data);
+                                  fetchedBridge = data.bridge || null;
+                                  console.log('Fetched bridge profile:', fetchedBridge);
+                                } else {
+                                  const errorText = await response.text();
+                                  console.error('Failed to fetch bridge profile:', response.status, errorText);
+                                }
+                              } catch (error) {
+                                console.error("Bridge profile fetch error:", error);
+                              }
+                            } else {
+                              console.log('1st degree connection, no bridge needed');
+                            }
+
+                            // THEN set states and open modal
                             setSelectedProfile(p);
+                            setBridgeProfile(fetchedBridge);
+                            console.log('Opening modal with bridge:', fetchedBridge);
                             setIsIntroModalOpen(true);
-                          }} 
+                          }}
                         />
                       </div>
                     </motion.div>
@@ -351,10 +384,14 @@ export default function DashboardPage() {
 
       <IntroModal
         isOpen={isIntroModalOpen}
-        onClose={() => setIsIntroModalOpen(false)}
+        onClose={() => {
+          setIsIntroModalOpen(false);
+          setSelectedProfile(null);
+          setBridgeProfile(null);
+        }}
         profile={selectedProfile}
+        bridgeProfile={bridgeProfile || undefined}
         currentUser={displayUser}
-        numMutuals={Math.floor(Math.random() * 12) + 1}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Copy,
@@ -25,10 +25,11 @@ import { XLogo, GrokLogo } from "@/components/ui/logos";
 import type { Profile } from "./ProfileCard";
 
 interface IntroModalProps {
-  numMutuals: number;
+  numMutuals?: number;
   isOpen: boolean;
   onClose: () => void;
   profile: Profile | null;
+  bridgeProfile?: Profile;
   currentUser?: {
     name: string;
     username: string;
@@ -44,6 +45,7 @@ export function IntroModal({
   isOpen,
   onClose,
   profile,
+  bridgeProfile,
   currentUser,
   onRegenerate,
   isLoading = false,
@@ -53,32 +55,71 @@ export function IntroModal({
   const [copied, setCopied] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [messageType, setMessageType] = useState<"direct" | "mutual">(
+    profile?.degree === 2 && bridgeProfile ? "mutual" : "direct"
+  );
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Generate intro with Grok when modal opens
   const generateIntro = async () => {
     if (!profile) return;
-    
+
+    // Cancel any ongoing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // For "Use Mutual", use the simple template message - no AI call needed
+    if (messageType === "mutual" && bridgeProfile) {
+      setIsGenerating(false);
+      setMessage(generateSampleIntro(profile, currentUser, bridgeProfile));
+      return;
+    }
+
+    // For "Message Directly", use AI to generate personalized message
     setIsGenerating(true);
     setError(null);
-    
+
+    // Create new AbortController for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     try {
       const response = await fetch("/api/generate-intro", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile, currentUser }),
+        body: JSON.stringify({
+          profile,
+          bridgeProfile: null, // Always null for direct messages
+          currentUser
+        }),
+        signal: abortController.signal,
       });
-      
+
       if (!response.ok) throw new Error("Failed to generate");
-      
+
       const data = await response.json();
-      setMessage(data.message);
-    } catch (e) {
+
+      // Only update if this request wasn't aborted
+      if (!abortController.signal.aborted) {
+        setMessage(data.message);
+      }
+    } catch (e: any) {
+      // Don't show error if request was aborted
+      if (e.name === 'AbortError') {
+        console.log("Request cancelled");
+        return;
+      }
       console.error("Error generating intro:", e);
       setError("Failed to generate intro. Please try again.");
       // Fallback to sample
-      setMessage(generateSampleIntro(profile, currentUser));
+      setMessage(generateSampleIntro(profile, currentUser, undefined));
     } finally {
-      setIsGenerating(false);
+      if (!abortController.signal.aborted) {
+        setIsGenerating(false);
+      }
+      abortControllerRef.current = null;
     }
   };
 
@@ -86,7 +127,15 @@ export function IntroModal({
     if (isOpen && profile) {
       generateIntro();
     }
-  }, [isOpen, profile]);
+
+    // Cleanup: abort request when component unmounts or modal closes
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, [isOpen, profile, messageType]);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message);
@@ -100,9 +149,10 @@ export function IntroModal({
   };
 
   const handleOpenDM = () => {
-    if (profile) {
+    const targetProfile = messageType === "mutual" && bridgeProfile ? bridgeProfile : profile;
+    if (targetProfile) {
       window.open(
-        `https://twitter.com/messages/compose?recipient_id=${profile.x_user_id}&text=${encodeURIComponent(message)}`,
+        `https://twitter.com/messages/compose?recipient_id=${targetProfile.x_user_id}&text=${encodeURIComponent(message)}`,
         "_blank"
       );
     }
@@ -136,9 +186,36 @@ export function IntroModal({
           </button>
         </div>
 
-        <div className="p-4 space-y-4">
+        <div className="px-4 pt-2 pb-4 space-y-4">
+          {/* Message type selector for 2nd degree connections */}
+          {profile.degree === 2 && bridgeProfile && (
+            <div className="flex gap-2 p-1 bg-[#16181c] rounded-lg">
+              <button
+                onClick={() => setMessageType("mutual")}
+                className={`flex-1 px-4 py-2 rounded-md text-sm font-bold transition-colors ${
+                  messageType === "mutual"
+                    ? "bg-[#1d9bf0] text-white"
+                    : "text-[#71767b] hover:text-[#e7e9ea]"
+                }`}
+              >
+                Use Mutual
+              </button>
+              <button
+                onClick={() => setMessageType("direct")}
+                className={`flex-1 px-4 py-2 rounded-md text-sm font-bold transition-colors ${
+                  messageType === "direct"
+                    ? "bg-[#1d9bf0] text-white"
+                    : "text-[#71767b] hover:text-[#e7e9ea]"
+                }`}
+              >
+                Message Directly
+              </button>
+            </div>
+          )}
+
           {/* Profile preview */}
-          <div className="flex items-center justify-between gap-3">
+          <div className="space-y-3">
+            {/* Target profile */}
             <div className="flex items-center gap-3">
               <Avatar className="w-12 h-12">
                 <AvatarImage src={profile.profile_image_url} alt={profile.name} />
@@ -160,12 +237,25 @@ export function IntroModal({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <Users className="w-4 h-4 text-[#1d9bf0]" />
-              <span className="text-[#1d9bf0] font-medium">
-                {`${numMutuals} mutuals`}
-              </span>
-            </div>
+            {/* Bridge profile (via) with bracket connector */}
+            {messageType === "mutual" && bridgeProfile && (
+              <div className="relative flex items-center gap-3 pl-8">
+                {/* 90 degree bracket connector */}
+                <div className="absolute left-0 top-[-12px] bottom-[calc(50%)] w-6 border-l-2 border-b-2 border-[#1d9bf0] rounded-bl-lg"></div>
+
+                <span className="text-xs text-gray-500 font-medium">via</span>
+                <Avatar className="w-10 h-10">
+                  <AvatarImage src={bridgeProfile.profile_image_url} alt={bridgeProfile.name} />
+                  <AvatarFallback className="bg-gray-800 text-white font-bold">
+                    {bridgeProfile.name.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-sm truncate text-[#1d9bf0]">{bridgeProfile.name}</div>
+                  <div className="text-xs text-gray-500">@{bridgeProfile.username}</div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Message editor */}
@@ -298,15 +388,13 @@ export function IntroModal({
 function generateSampleIntro(
   profile: Profile,
   currentUser?: { name: string; username: string },
-  variant = false
+  bridgeProfile?: Profile
 ): string {
-  const intros = [
-    `Hey ${profile.name.split(" ")[0]}! 👋 I came across your profile through our mutual network and love your work on ${profile.topics?.[0] || "tech"}. Would love to connect and learn more about your journey!`,
-    `Hi ${profile.name.split(" ")[0]}! I noticed we share some connections and interests in ${profile.topics?.[0] || "the industry"}. Your thoughts on ${profile.topics?.[1] || "innovation"} really resonate. Would be great to connect!`,
-    `${profile.name.split(" ")[0]}, your insights on ${profile.topics?.[0] || "technology"} are 🔥! We're connected through a few mutual friends. Mind if we connect?`,
-  ];
-
-  return variant
-    ? intros[Math.floor(Math.random() * intros.length)]
-    : intros[0];
+  if (bridgeProfile) {
+    // Message for mutual connection introduction - asking the bridge to introduce you
+    return `Hey ${bridgeProfile.name.split(" ")[0]}, how's everything going? I saw you're connected with ${profile.name.split(" ")[0]} and was hoping you could introduce me. Thanks!`;
+  } else {
+    // Direct message to the target profile
+    return `Hey ${profile.name.split(" ")[0]}! 👋 I came across your profile through our mutual network and love your work. Would love to connect and learn more about your journey!`;
+  }
 }

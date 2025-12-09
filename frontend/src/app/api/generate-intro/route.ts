@@ -9,8 +9,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { profile, currentUser } = await request.json();
-    
+    const { profile, bridgeProfile, currentUser } = await request.json();
+
     if (!profile) {
       return NextResponse.json({ error: "Profile is required" }, { status: 400 });
     }
@@ -20,7 +20,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Grok API not configured" }, { status: 500 });
     }
 
-    const prompt = `You are helping ${currentUser?.name || "a user"} (@${currentUser?.username || "user"}) write a personalized Twitter/X DM to introduce themselves to someone in their network.
+    let prompt;
+
+    if (bridgeProfile) {
+      // Message asking the bridge to introduce you to the target
+      prompt = `You are helping ${currentUser?.name || "a user"} write a DM to ask a mutual connection for an introduction.
+
+MUTUAL CONNECTION (who you're messaging):
+- Name: ${bridgeProfile.name}
+- Username: @${bridgeProfile.username}
+
+PERSON YOU WANT TO MEET:
+- Name: ${profile.name}
+- Username: @${profile.username}
+- Bio: ${profile.bio || "No bio available"}
+
+Write a casual, friendly message asking ${bridgeProfile.name.split(" ")[0]} to introduce you to ${profile.name.split(" ")[0]}. Keep it under 280 characters. Be genuine and concise.
+
+Format: "Hey {bridge first name}, how's everything going? I saw you're connected with {target first name} and was hoping you could introduce me. Thanks!"
+
+Write ONLY the message:`;
+    } else {
+      // Direct message to the target profile
+      prompt = `You are helping ${currentUser?.name || "a user"} (@${currentUser?.username || "user"}) write a personalized Twitter/X DM to introduce themselves to someone in their network.
 
 TARGET PERSON:
 - Name: ${profile.name}
@@ -45,6 +67,7 @@ DO NOT:
 - Use generic phrases like "love your work"
 
 Write ONLY the DM message, nothing else:`;
+    }
 
     const response = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",

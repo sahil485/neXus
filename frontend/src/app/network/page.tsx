@@ -10,6 +10,7 @@ import {
   LogOut,
   ArrowLeft,
   Sparkles,
+  MessageSquare,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -29,7 +30,9 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/components/AuthProvider";
 import { useRouter } from "next/navigation";
 import GraphVisualization from "@/components/GraphVisualization";
-import { XLogo, GrokLogo } from "@/components/ui/logos";
+import { XLogo } from "@/components/ui/logos";
+import { IntroModal } from "@/components/IntroModal";
+import type { Profile } from "@/components/ProfileCard";
 
 interface NetworkProfile {
   x_user_id: string;
@@ -55,13 +58,15 @@ export default function NetworkPage() {
   const [edges, setEdges] = useState<{ source: string; target: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"all" | "1st" | "2nd">("all");
-  const [viewMode, setViewMode] = useState<"list" | "graph">("list");
+  const [viewMode, setViewMode] = useState<"list" | "graph">("graph");
   const [selectedProfile, setSelectedProfile] = useState<NetworkProfile | null>(null);
   const [bridgeProfile, setBridgeProfile] = useState<NetworkProfile | null>(null);
   const [topicMode, setTopicMode] = useState(false);
   const [topicData, setTopicData] = useState<{ user_id: string; topic: string; topic_confidence: number }[]>([]);
   const [topicColors, setTopicColors] = useState<{ [key: string]: string }>({});
   const [loadingTopics, setLoadingTopics] = useState(false);
+  const [isIntroModalOpen, setIsIntroModalOpen] = useState(false);
+  const [profileForIntro, setProfileForIntro] = useState<Profile | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -248,23 +253,23 @@ export default function NetworkPage() {
           {/* View Mode Tabs */}
           <div className="flex border-b border-[#2f3336]">
             <button
-              onClick={() => setViewMode("list")}
-              className="flex-1 h-[53px] hover:bg-white/10 transition-colors relative flex items-center justify-center"
-            >
-              <span className={`font-medium text-[15px] ${viewMode === "list" ? "font-bold text-[#e7e9ea]" : "text-[#71767b]"}`}>
-                List View
-                {viewMode === "list" && (
-                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[70px] h-[4px] bg-[#1d9bf0] rounded-full" />
-                )}
-              </span>
-            </button>
-            <button
               onClick={() => setViewMode("graph")}
               className="flex-1 h-[53px] hover:bg-white/10 transition-colors relative flex items-center justify-center"
             >
               <span className={`font-medium text-[15px] ${viewMode === "graph" ? "font-bold text-[#e7e9ea]" : "text-[#71767b]"}`}>
                 Graph View
                 {viewMode === "graph" && (
+                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[70px] h-[4px] bg-[#1d9bf0] rounded-full" />
+                )}
+              </span>
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className="flex-1 h-[53px] hover:bg-white/10 transition-colors relative flex items-center justify-center"
+            >
+              <span className={`font-medium text-[15px] ${viewMode === "list" ? "font-bold text-[#e7e9ea]" : "text-[#71767b]"}`}>
+                List View
+                {viewMode === "list" && (
                   <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[70px] h-[4px] bg-[#1d9bf0] rounded-full" />
                 )}
               </span>
@@ -460,21 +465,72 @@ export default function NetworkPage() {
                     </div>
                   </div>
 
-                  <a
-                    href={`https://x.com/${selectedProfile.username}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center w-full bg-white/100 hover:bg-white/70 font-bold h-[40px] rounded-full transition-colors mt-4 text-black shadow-lg"
-                  >
-                    <span className="text-5 text-black">View on</span>
-                    <XLogo className="w-4 h-4 ml-1 text-black" />
-                  </a>
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => {
+                        setProfileForIntro({
+                          id: selectedProfile.x_user_id,
+                          x_user_id: selectedProfile.x_user_id,
+                          username: selectedProfile.username,
+                          name: selectedProfile.name,
+                          bio: selectedProfile.bio,
+                          profile_image_url: selectedProfile.profile_image_url,
+                          followers_count: selectedProfile.followers_count,
+                          following_count: selectedProfile.following_count,
+                          degree: selectedProfile.degree,
+                          matchLevel: "Good",
+                          aiReason: undefined,
+                          verifying: false,
+                        });
+                        setIsIntroModalOpen(true);
+                      }}
+                      className="flex items-center justify-center gap-2 w-full bg-[#1d9bf0] hover:bg-[#1a8cd8] font-bold h-[40px] rounded-full transition-colors text-white shadow-lg"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span>Generate Intro</span>
+                    </button>
+                    <a
+                      href={`https://x.com/${selectedProfile.username}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center w-full bg-white/100 hover:bg-white/70 font-bold h-[40px] rounded-full transition-colors text-black shadow-lg"
+                    >
+                      <span className="text-5 text-black">View on</span>
+                      <XLogo className="w-4 h-4 ml-1 text-black" />
+                    </a>
+                  </div>
                 </div>
               </div>
             </>
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Intro Modal */}
+      {profileForIntro && (
+        <IntroModal
+          isOpen={isIntroModalOpen}
+          onClose={() => {
+            setIsIntroModalOpen(false);
+            setProfileForIntro(null);
+          }}
+          profile={profileForIntro}
+          bridgeProfile={bridgeProfile ? {
+            id: bridgeProfile.x_user_id,
+            x_user_id: bridgeProfile.x_user_id,
+            username: bridgeProfile.username,
+            name: bridgeProfile.name,
+            bio: bridgeProfile.bio,
+            profile_image_url: bridgeProfile.profile_image_url,
+            followers_count: bridgeProfile.followers_count,
+            following_count: bridgeProfile.following_count,
+            degree: bridgeProfile.degree,
+            matchLevel: "Good",
+            aiReason: undefined,
+            verifying: false,
+          } : undefined}
+        />
+      )}
     </div>
   );
 }
