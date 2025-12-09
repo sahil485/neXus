@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { Loader2, Box, Circle, ZoomOut, Search, X, Sparkles } from "lucide-react";
+import { Loader2, Box, Circle, Search, X, Sparkles, Power } from "lucide-react";
 import * as THREE from "three";
+import { Switch } from "@/components/ui/switch";
 
 // Grok Logo SVG Component
 function GrokLogo({ className = "w-4 h-4" }: { className?: string }) {
@@ -64,9 +65,11 @@ interface GraphVisualizationProps {
   topicData?: { user_id: string; topic: string; topic_confidence: number }[];
   topicColors?: { [key: string]: string };
   enableTopicMode?: boolean;
+  onTopicModeToggle?: () => void;
+  loadingTopics?: boolean;
 }
 
-export default function GraphVisualization({ profiles, edges, currentUser, onNodeClick, selectedNodeId, topicData = [], topicColors = {}, enableTopicMode = false }: GraphVisualizationProps) {
+export default function GraphVisualization({ profiles, edges, currentUser, onNodeClick, selectedNodeId, topicData = [], topicColors = {}, enableTopicMode = false, onTopicModeToggle, loadingTopics = false }: GraphVisualizationProps) {
   const fgRef = useRef<any>(null);
   const [is3D, setIs3D] = useState(false);
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
@@ -279,7 +282,7 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
   }, [graphData, enableTopicMode]);
 
   return (
-    <div className="w-full h-full bg-black rounded-lg overflow-hidden border border-[#2f3336] relative">
+    <div className="w-full h-full bg-black overflow-hidden relative">
       {/* Search Bar */}
       <div className="absolute top-4 left-4 z-10 pointer-events-auto">
         <div className="flex items-center gap-2 bg-black/80 backdrop-blur-lg p-2 rounded-full border border-[#2f3336] shadow-lg">
@@ -307,16 +310,44 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
         )}
       </div>
 
-      {/* Legend */}
+      {/* Controls and Legend */}
       <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 items-end pointer-events-none">
+        {/* Switches */}
+        <div className="flex flex-col gap-3 pointer-events-auto">
+          {onTopicModeToggle && (
+            <div className="bg-black/80 backdrop-blur-lg px-4 py-3 rounded-lg border border-[#2f3336] shadow-lg">
+              <div className="flex items-center gap-3">
+                {loadingTopics ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-[#1d9bf0]" />
+                ) : (
+                  <GrokLogo className="w-4 h-4 text-[#e7e9ea]" />
+                )}
+                <span className="text-xs font-bold text-[#e7e9ea] flex-1">Network Pulse</span>
+                <Switch
+                  checked={enableTopicMode}
+                  onCheckedChange={onTopicModeToggle}
+                  disabled={loadingTopics}
+                />
+              </div>
+            </div>
+          )}
+          <div className="bg-black/80 backdrop-blur-lg px-4 py-3 rounded-lg border border-[#2f3336] shadow-lg">
+            <div className="flex items-center gap-3">
+              {is3D ? <Box className="w-4 h-4 text-[#e7e9ea]" /> : <Circle className="w-4 h-4 text-[#e7e9ea]" />}
+              <span className="text-xs font-bold text-[#e7e9ea] flex-1">3D View</span>
+              <Switch
+                checked={is3D}
+                onCheckedChange={setIs3D}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Legend */}
         <div className="bg-black/80 p-2 rounded-lg border border-[#2f3336] pointer-events-auto max-h-64 overflow-y-auto">
           {enableTopicMode ? (
             // Topic mode legend
             <>
-              <div className="flex items-center gap-2 mb-2 pb-2 border-b border-[#2f3336]">
-                <Sparkles className="w-3 h-3 text-[#1d9bf0]" />
-                <span className="text-xs font-bold text-[#1d9bf0]">Network Pulse</span>
-              </div>
               {uniqueTopics.slice(0, 8).map(([topic, color]) => (
                 <div key={topic} className="flex items-center gap-2 mb-1">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
@@ -341,23 +372,6 @@ export default function GraphVisualization({ profiles, edges, currentUser, onNod
               </div>
             </>
           )}
-        </div>
-
-        <div className="flex gap-2 pointer-events-auto">
-          <button
-            onClick={() => fgRef.current?.zoomToFit(1000)}
-            className="bg-[#2f3336] hover:bg-[#1a8cd8] text-white p-2 rounded-lg shadow-lg transition-colors flex items-center justify-center"
-            title="Zoom Out / Reset"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setIs3D(!is3D)}
-            className="bg-[#1d9bf0] hover:bg-[#1a8cd8] text-white p-2 rounded-lg shadow-lg transition-colors flex items-center gap-2"
-          >
-            {is3D ? <Circle className="w-4 h-4" /> : <Box className="w-4 h-4" />}
-            <span className="text-xs font-bold">{is3D ? "2D View" : "3D View"}</span>
-          </button>
         </div>
       </div>
       

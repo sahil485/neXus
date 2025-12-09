@@ -271,32 +271,6 @@ export default function NetworkPage() {
             </button>
           </div>
 
-          {/* Topic Mode Toggle for Graph View */}
-          {viewMode === "graph" && (
-            <div className="flex items-center justify-center p-3 border-b border-[#2f3336] bg-[#16181c]">
-              <button
-                onClick={() => setTopicMode(!topicMode)}
-                disabled={loadingTopics}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all ${
-                  topicMode 
-                    ? "bg-[#1d9bf0] text-white hover:bg-[#1a8cd8]" 
-                    : "bg-[#2f3336] text-[#e7e9ea] hover:bg-[#3f4346]"
-                }`}
-              >
-                {loadingTopics ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <GrokLogo className="w-4 h-4" />
-                )}
-                {topicMode ? "Network Pulse ON" : "Enable Network Pulse"}
-              </button>
-              {topicMode && (
-                <span className="ml-3 text-xs text-[#71767b]">
-                  Nodes colored by topic clusters
-                </span>
-              )}
-            </div>
-          )}
 
           {/* Sub-tabs for List View */}
           {viewMode === "list" && (
@@ -402,15 +376,17 @@ export default function NetworkPage() {
           </div>
         ) : (
           <div className="h-[calc(100vh-106px)] w-full relative">
-            <GraphVisualization 
-              profiles={profiles} 
-              edges={edges} 
+            <GraphVisualization
+              profiles={profiles}
+              edges={edges}
               currentUser={displayUser}
               onNodeClick={handleNodeClick}
               selectedNodeId={selectedProfile?.x_user_id}
               topicData={topicData}
               topicColors={topicColors}
               enableTopicMode={topicMode}
+              onTopicModeToggle={() => setTopicMode(!topicMode)}
+              loadingTopics={loadingTopics}
             />
           </div>
         )}
