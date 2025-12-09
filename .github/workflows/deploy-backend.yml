@@ -17,12 +17,17 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      TWITTER_CLIENT_ID: ${{ secrets.TWITTER_CLIENT_ID }}
-      TWITTER_CLIENT_SECRET: ${{ secrets.TWITTER_CLIENT_SECRET }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      DB_USER: ${{ secrets.DB_USER }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      DB_HOST: ${{ secrets.DB_HOST }}
+      DB_PORT: ${{ secrets.DB_PORT }}
+      DB_NAME: ${{ secrets.DB_NAME }}
+      BEARER_TOKEN: ${{ secrets.BEARER_TOKEN }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
     steps:
       - name: Checkout
@@ -46,12 +51,17 @@ jobs:
         run: |
           cd backend
           echo "DATABASE_URL=${{ env.DATABASE_URL }}" >> .env
-          echo "SUPABASE_URL=${{ env.SUPABASE_URL }}" >> .env
-          echo "SUPABASE_KEY=${{ env.SUPABASE_KEY }}" >> .env
-          echo "TWITTER_CLIENT_ID=${{ env.TWITTER_CLIENT_ID }}" >> .env
-          echo "TWITTER_CLIENT_SECRET=${{ env.TWITTER_CLIENT_SECRET }}" >> .env
-          echo "OPENAI_API_KEY=${{ env.OPENAI_API_KEY }}" >> .env
-          echo "ANTHROPIC_API_KEY=${{ env.ANTHROPIC_API_KEY }}" >> .env
+          echo "DB_USER=${{ env.DB_USER }}" >> .env
+          echo "DB_PASSWORD=${{ env.DB_PASSWORD }}" >> .env
+          echo "DB_HOST=${{ env.DB_HOST }}" >> .env
+          echo "DB_PORT=${{ env.DB_PORT }}" >> .env
+          echo "DB_NAME=${{ env.DB_NAME }}" >> .env
+          echo "BEARER_TOKEN=${{ env.BEARER_TOKEN }}" >> .env
+          echo "NEXT_PUBLIC_SUPABASE_URL=${{ env.NEXT_PUBLIC_SUPABASE_URL }}" >> .env
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ env.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" >> .env
+          echo "SUPABASE_SERVICE_ROLE_KEY=${{ env.SUPABASE_SERVICE_ROLE_KEY }}" >> .env
+          echo "GROK_API_KEY=${{ env.GROK_API_KEY }}" >> .env
+          echo "GEMINI_API_KEY=${{ env.GEMINI_API_KEY }}" >> .env
 
       - name: Build Docker image
         run: |
@@ -72,12 +82,17 @@ jobs:
           VERSION: ${{ steps.get_version.outputs.version }}
           ENVIRONMENT: prod
           DATABASE_URL: ${{ env.DATABASE_URL }}
-          SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ env.SUPABASE_KEY }}
-          TWITTER_CLIENT_ID: ${{ env.TWITTER_CLIENT_ID }}
-          TWITTER_CLIENT_SECRET: ${{ env.TWITTER_CLIENT_SECRET }}
-          OPENAI_API_KEY: ${{ env.OPENAI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ env.ANTHROPIC_API_KEY }}
+          DB_USER: ${{ env.DB_USER }}
+          DB_PASSWORD: ${{ env.DB_PASSWORD }}
+          DB_HOST: ${{ env.DB_HOST }}
+          DB_PORT: ${{ env.DB_PORT }}
+          DB_NAME: ${{ env.DB_NAME }}
+          BEARER_TOKEN: ${{ env.BEARER_TOKEN }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.SUPABASE_SERVICE_ROLE_KEY }}
+          GROK_API_KEY: ${{ env.GROK_API_KEY }}
+          GEMINI_API_KEY: ${{ env.GEMINI_API_KEY }}
 
       - name: Deploy to prod
         run: |
@@ -87,12 +102,17 @@ jobs:
           VERSION: ${{ steps.get_version.outputs.version }}
           ENVIRONMENT: prod
           DATABASE_URL: ${{ env.DATABASE_URL }}
-          SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ env.SUPABASE_KEY }}
-          TWITTER_CLIENT_ID: ${{ env.TWITTER_CLIENT_ID }}
-          TWITTER_CLIENT_SECRET: ${{ env.TWITTER_CLIENT_SECRET }}
-          OPENAI_API_KEY: ${{ env.OPENAI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ env.ANTHROPIC_API_KEY }}
+          DB_USER: ${{ env.DB_USER }}
+          DB_PASSWORD: ${{ env.DB_PASSWORD }}
+          DB_HOST: ${{ env.DB_HOST }}
+          DB_PORT: ${{ env.DB_PORT }}
+          DB_NAME: ${{ env.DB_NAME }}
+          BEARER_TOKEN: ${{ env.BEARER_TOKEN }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.SUPABASE_SERVICE_ROLE_KEY }}
+          GROK_API_KEY: ${{ env.GROK_API_KEY }}
+          GEMINI_API_KEY: ${{ env.GEMINI_API_KEY }}
 
       - name: Deployment Summary
         run: |

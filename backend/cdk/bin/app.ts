@@ -11,12 +11,17 @@ const environment = process.env.ENVIRONMENT || "dev";
 // Get environment variables
 const envVars = {
   DATABASE_URL: getEnvVarOrThrow("DATABASE_URL"),
-  SUPABASE_URL: getEnvVarOrThrow("SUPABASE_URL"),
-  SUPABASE_KEY: getEnvVarOrThrow("SUPABASE_KEY"),
-  TWITTER_CLIENT_ID: getEnvVarOrThrow("TWITTER_CLIENT_ID"),
-  TWITTER_CLIENT_SECRET: getEnvVarOrThrow("TWITTER_CLIENT_SECRET"),
-  OPENAI_API_KEY: getEnvVarOrThrow("OPENAI_API_KEY"),
-  ANTHROPIC_API_KEY: getEnvVarOrThrow("ANTHROPIC_API_KEY"),
+  DB_USER: getEnvVarOrThrow("DB_USER"),
+  DB_PASSWORD: getEnvVarOrThrow("DB_PASSWORD"),
+  DB_HOST: getEnvVarOrThrow("DB_HOST"),
+  DB_PORT: getEnvVarOrThrow("DB_PORT"),
+  DB_NAME: getEnvVarOrThrow("DB_NAME"),
+  BEARER_TOKEN: getEnvVarOrThrow("BEARER_TOKEN"),
+  NEXT_PUBLIC_SUPABASE_URL: getEnvVarOrThrow("NEXT_PUBLIC_SUPABASE_URL"),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: getEnvVarOrThrow("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+  SUPABASE_SERVICE_ROLE_KEY: getEnvVarOrThrow("SUPABASE_SERVICE_ROLE_KEY"),
+  GROK_API_KEY: getEnvVarOrThrow("GROK_API_KEY"),
+  GEMINI_API_KEY: getEnvVarOrThrow("GEMINI_API_KEY"),
 };
 
 new NexusBackendStack(app, `nexus-backend-${environment}`, {

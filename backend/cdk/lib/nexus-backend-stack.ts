@@ -10,12 +10,17 @@ const SERVICE_NAME = "nexus-backend";
 
 export interface NexusEnvVariables {
   DATABASE_URL: string;
-  SUPABASE_URL: string;
-  SUPABASE_KEY: string;
-  TWITTER_CLIENT_ID: string;
-  TWITTER_CLIENT_SECRET: string;
-  OPENAI_API_KEY: string;
-  ANTHROPIC_API_KEY: string;
+  DB_USER: string;
+  DB_PASSWORD: string;
+  DB_HOST: string;
+  DB_PORT: string;
+  DB_NAME: string;
+  BEARER_TOKEN: string;
+  NEXT_PUBLIC_SUPABASE_URL: string;
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: string;
+  SUPABASE_SERVICE_ROLE_KEY: string;
+  GROK_API_KEY: string;
+  GEMINI_API_KEY: string;
   [key: string]: string;
 }
 
